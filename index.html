@@ -137,7 +137,7 @@
          font-size:12.5px;padding:9px 18px;border-radius:20px;opacity:0;pointer-events:none;transition:.18s;z-index:60}
   .toast.show{opacity:.96;transform:translateX(-50%)}
 
-  /* ================= 雲端同步（Google Drive） ================= */
+  /* ================= 跨裝置同步（GitHub Gist） ================= */
   .sync-chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-size:12.5px;color:var(--ink-soft);
              border:1px solid var(--line);background:var(--paper);padding:6px 12px;border-radius:20px;cursor:pointer}
   .sync-chip:hover{border-color:var(--blue);color:var(--blue)}
@@ -168,10 +168,9 @@
   .sync-help{font-size:11px;color:var(--ink-soft);line-height:1.65;background:var(--amber-wash);border-left:3px solid var(--amber);
              padding:9px 11px;border-radius:0 5px 5px 0;margin-top:8px;white-space:pre-wrap}
   .sync-help a{color:var(--blue)}
+  .gist-link{font-size:11.5px;color:var(--blue);text-decoration:none;border-bottom:1px dotted var(--blue);padding-bottom:1px}
   @media(max-width:900px){.drawer{width:100%}.mb-status{margin-left:0;flex-basis:100%}}
 </style>
-<!-- Google Identity Services：取得存取權杖用（沒有網路或未設定時，整個工具仍可純本機使用） -->
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <div class="app">
@@ -202,7 +201,7 @@
         <input id="metaMemo" class="txt w-m" type="text" placeholder="自用備註，不會進入病歷">
         <span class="mb-status" id="draftStatus">草稿自動保存中</span>
       </div>
-      <div class="mb-hint">每次填完按「存成新紀錄」就留下一筆；目前內容會自動存成草稿，下次打開自動接續。紀錄預設只存在這台電腦的瀏覽器，連結 Google 雲端硬碟後才會同步到你自己的雲端硬碟。建議標題只寫床號或代號，不要填姓名與病歷號。</div>
+      <div class="mb-hint">每次填完按「存成新紀錄」就留下一筆；目前內容會自動存成草稿，下次打開自動接續。紀錄預設只存在這台電腦的瀏覽器，設定了 GitHub token 之後才會同步到你自己的私密 Gist。建議標題只寫床號或代號，不要填姓名與病歷號。</div>
     </div>
 
     <div id="sections"></div>
@@ -226,25 +225,26 @@
     <button class="dw-x" id="recClose" title="關閉">✕</button>
   </div>
   <details class="sync-box" id="syncBox">
-    <summary>雲端同步（Google 雲端硬碟）</summary>
+    <summary>跨裝置同步（GitHub Gist）</summary>
     <div class="sync-body">
       <div class="sync-line"><b>狀態：</b><span id="syncStatusText">未連結</span></div>
-      <div class="sync-row" id="gidRow">
-        <input id="gidInput" type="text" placeholder="貼上 OAuth 用戶端 ID（....apps.googleusercontent.com）">
-        <button id="gidSave">儲存</button>
+      <div class="sync-row" id="tokenRow">
+        <input id="tokenInput" type="password" placeholder="貼上 GitHub token（ghp_…）" autocomplete="off">
+        <button id="gConnect" class="go">連結並同步</button>
       </div>
       <div class="sync-row">
-        <button id="gConnect" class="go">連結雲端硬碟</button>
         <button id="gSyncNow">立即同步</button>
         <label><input type="checkbox" id="gAuto" checked> 自動同步</label>
+        <a id="gistLink" class="gist-link" target="_blank" rel="noopener" style="display:none">在 GitHub 上看這個 Gist</a>
         <button id="gDisconnect" class="danger">中斷連結</button>
       </div>
-      <div class="sync-help" id="syncHelp">第一次設定（只要做一次，之後每台裝置只需登入同一個 Google 帳號）：
-1. 到 Google Cloud Console 建立專案 → 「API 和服務」→「OAuth 同意畫面」，User type 選 External，把自己的 Gmail 加進 Test users。
-2. 「憑證」→ 建立憑證 →「OAuth 用戶端 ID」→ 應用程式類型選「網頁應用程式」。
-3. 「已授權的 JavaScript 來源」填入這一行（就是這個網站的來源，不含路徑）：{ORIGIN}
-4. 複製產生的用戶端 ID，貼到上面欄位按「儲存」，再按「連結雲端硬碟」。
-權限只要求 drive.file：這個程式只能讀寫它自己建立的那一個檔案，看不到你雲端硬碟裡其他東西。資料會存成雲端硬碟裡的 cv_consult_records.json。</div>
+      <div class="sync-help" id="syncHelp">第一次設定（約 2 分鐘，每台裝置貼一次同一組 token）：
+1. GitHub 右上角頭像 → Settings → 最下面 Developer settings → Personal access tokens → Tokens (classic)。
+2. Generate new token (classic) → Note 隨便填（例如 cv-consult）→ Expiration 建議選 90 days 或 1 year。
+3. Select scopes 只勾「gist」這一項，其他都不要勾 → Generate token。
+4. 複製那串 ghp_ 開頭的字（離開那個頁面就看不到了）→ 貼到上面欄位 → 按「連結並同步」。
+5. 其他裝置（家裡電腦、手機）打開同一個網址，貼同一組 token 即可。
+紀錄會存成你帳號底下一個「私密 Gist」，只有你自己看得到。token 只存在這台瀏覽器；公用電腦用完請按下面的「離開這台電腦」。</div>
     </div>
   </details>
   <div class="dw-tools">
@@ -258,7 +258,7 @@
     <button id="clearAllRecs" class="danger">刪除全部紀錄</button>
     <button id="wipeDevice" class="danger">離開這台電腦</button>
     <input type="file" id="impFile" accept="application/json,.json" hidden>
-    <div class="dw-hint">紀錄儲存在本機瀏覽器（localStorage），連結雲端硬碟後會同步到你自己的 Google 雲端硬碟。<br>「刪除全部紀錄」＝連雲端的也一起刪掉；在公用電腦用完只要按「離開這台電腦」（登出並清掉這台機器的本機資料，雲端保留）。</div>
+    <div class="dw-hint">紀錄儲存在本機瀏覽器（localStorage），連結後會同步到你 GitHub 帳號底下的私密 Gist。<br>「刪除全部紀錄」＝連 Gist 上的也一起刪掉；在公用電腦用完只要按「離開這台電腦」（忘掉 token 並清掉這台機器的本機資料，Gist 保留）。</div>
   </div>
 </aside>
 <div class="toast" id="toast"></div>
@@ -1032,9 +1032,9 @@ function importJson(file){
 }
 function clearAllRecords(){
   if(!RECS.length){ toast('目前沒有紀錄'); return; }
-  const cloud = isConnected()? '（連同雲端硬碟上的，以及其他裝置下次同步後的紀錄）' : '';
+  const cloud = isConnected()? '（連同 Gist 上的，以及其他裝置下次同步後的紀錄）' : '';
   if(!confirm('刪除全部 '+RECS.length+' 筆紀錄'+cloud+'？無法復原，建議先「匯出 JSON」備份。')) return;
-  if(!confirm('再確認一次：真的要全部刪除嗎？\n（只是想清掉這台電腦的資料、保留雲端，請改按「離開這台電腦」）')) return;
+  if(!confirm('再確認一次：真的要全部刪除嗎？\n（只是想清掉這台電腦的資料、保留 Gist，請改按「離開這台電腦」）')) return;
   RECS.forEach(r=>addTomb(r.id));
   RECS=[]; persist(); currentId=null;
   try{ localStorage.removeItem(LS_DRAFT); }catch(e){}
@@ -1042,43 +1042,41 @@ function clearAllRecords(){
 }
 /* 公用電腦用完：登出 + 清掉這台機器的本機資料，雲端的紀錄保留 */
 function wipeDevice(){
-  if(!confirm('要清掉這台電腦上的所有本機資料並登出雲端嗎？\n雲端硬碟上的紀錄會保留，之後重新登入就能拉回來。')) return;
-  gRevoke();
-  [LS_REC, LS_DRAFT, LS_DEL, LS_TOKEN, LS_FILEID, LS_EMAIL, LS_CONNECTED, LS_LASTSYNC].forEach(k=>{
+  if(!confirm('要清掉這台電腦上的所有本機資料、並忘掉 token 嗎？\nGist 上的紀錄會保留，之後在任何裝置貼回 token 就能拉回來。')) return;
+  forgetToken();
+  if(elTok) elTok.value='';
+  [LS_REC, LS_DRAFT, LS_DEL, LS_TOKEN, LS_GISTID, LS_LOGIN, LS_CONNECTED, LS_LASTSYNC].forEach(k=>{
     try{ localStorage.removeItem(k); }catch(e){}
   });
   RECS=[]; currentId=null;
   restoreSnapshot(DEFAULT_SNAP);
   meta.date=todayStr(); elDate.value=meta.date;
-  render(); renderRecList(); setSyncUI(); toast('已登出並清空這台電腦的資料');
+  render(); renderRecList(); setSyncUI(); toast('已清空這台電腦的資料並忘記 token');
 }
 
 /* =========================================================================
-   SYNC — 跨裝置同步（Google 雲端硬碟）
-   • 資料存成你自己雲端硬碟裡的一個 JSON 檔，不經過任何第三方伺服器
-   • 權限只要 drive.file：本程式只碰得到它自己建立的那一個檔案
-   • 本機優先：沒網路／沒登入時，整個工具照常運作，之後再補同步
+   SYNC — 跨裝置同步（GitHub 私密 Gist）
+   • 所有紀錄存成你 GitHub 帳號底下一個「私密 Gist」裡的 JSON 檔
+   • 只需要一組勾選 gist 權限的 token，不用開發者主控台、不用審核
+   • 本機優先：沒網路／沒填 token 時，整個工具照常運作，之後再補同步
    ========================================================================= */
-const GOOGLE_CLIENT_ID = '';   /* ← 想寫死的話把用戶端 ID 貼在這裡（留空則用同步面板裡的設定） */
+const GH_TOKEN_PRESET = '';        /* 一般留空。填了的話所有開這個網站的人都會共用它，務必想清楚 */
 
-const GD_SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
-const GD_NAME  = 'cv_consult_records.json';
-const LS_GID='cvconsult_gclient_id', LS_TOKEN='cvconsult_gtoken', LS_FILEID='cvconsult_gfileid',
-      LS_EMAIL='cvconsult_gemail', LS_CONNECTED='cvconsult_gconnected',
-      LS_DEL='cvconsult_deleted_v1', LS_AUTO='cvconsult_autosync', LS_LASTSYNC='cvconsult_lastsync';
+const GIST_FILE = 'cv_consult_records.json';
+const GIST_DESC = '心肺照會病歷產生器：跨裝置同步檔（請勿手動修改）';
+const GH_API    = 'https://api.github.com';
+const LS_TOKEN='cvconsult_ghtoken', LS_GISTID='cvconsult_gistid', LS_LOGIN='cvconsult_ghlogin',
+      LS_CONNECTED='cvconsult_ghconnected', LS_DEL='cvconsult_deleted_v1',
+      LS_AUTO='cvconsult_autosync', LS_LASTSYNC='cvconsult_lastsync';
 
-let gToken=null, gExp=0, gFileId=null, gEmail='', tokenClient=null, pendingAuth=null;
-let syncing=false, syncTimer=null, lastSyncTry=0;
-/* 權杖過期後，瀏覽器會擋掉「沒有經過點擊」的授權視窗；失敗一次就別再自動重試，
-   改成把狀態顯示成「需重新登入」，等使用者自己點一下（那時才有手勢，視窗才開得起來） */
-let silentAuthBlocked=false;
+let gistId=null, ghLogin='', syncing=false, syncTimer=null, lastSyncTry=0;
 
 const elChip=$('syncChip'), elChipText=$('syncText'), elSyncStatus=$('syncStatusText'),
-      elGid=$('gidInput'), elAuto=$('gAuto'), elGidRow=$('gidRow');
+      elTok=$('tokenInput'), elAuto=$('gAuto'), elTokRow=$('tokenRow'), elGistLink=$('gistLink');
 
-function gClientId(){ return (GOOGLE_CLIENT_ID||'').trim() || String(lsGet(LS_GID,'')||'').trim(); }
+function ghToken(){ return (GH_TOKEN_PRESET||'').trim() || String(lsGet(LS_TOKEN,'')||'').trim(); }
 function autoOn(){ const v=lsGet(LS_AUTO,null); return v===null? true : !!v; }
-function isConnected(){ return !!(gClientId() && lsGet(LS_CONNECTED,false)); }
+function isConnected(){ return !!(ghToken() && lsGet(LS_CONNECTED,false)); }
 
 /* ---------- 刪除記號（墓碑）：讓「刪除」也能同步出去 ---------- */
 function loadTombs(){ const a=lsGet(LS_DEL,[]); return Array.isArray(a)? a: []; }
@@ -1118,166 +1116,114 @@ function mergeRecords(local, remote, tombs){
   return [...m.values()].sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
 }
 
-/* ---------- 授權 ---------- */
-function gisReady(){
-  return new Promise((res,rej)=>{
-    if(window.google && google.accounts && google.accounts.oauth2) return res();
-    let n=0;
-    const t=setInterval(()=>{
-      if(window.google && google.accounts && google.accounts.oauth2){ clearInterval(t); res(); }
-      else if(++n>60){ clearInterval(t); rej(new Error('載入 Google 登入元件失敗（網路或防火牆擋住 accounts.google.com）')); }
-    },150);
-  });
-}
-async function initTokenClient(){
-  const cid=gClientId();
-  if(!cid) throw authErr('尚未設定 OAuth 用戶端 ID');
-  if(tokenClient && tokenClient._cid===cid) return tokenClient;
-  await gisReady();
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: cid,
-    scope: GD_SCOPE,
-    callback: (resp)=>{
-      const p=pendingAuth; pendingAuth=null;
-      if(resp && resp.access_token){
-        gToken=resp.access_token;
-        gExp=Date.now()+(((resp.expires_in||3600)-90)*1000);
-        silentAuthBlocked=false;
-        lsSet(LS_TOKEN,{token:gToken, exp:gExp}); lsSet(LS_CONNECTED,true);
-        fetchEmail();
-        if(p) p.resolve(gToken);
-      } else if(p) p.reject(authErr('沒有取得授權'));
-    },
-    error_callback: (err)=>{
-      const p=pendingAuth; pendingAuth=null;
-      if(p && !p.interactive) silentAuthBlocked=true;
-      if(p) p.reject(authErr('授權已過期，請點一下「立即同步」重新登入'));
-    }
-  });
-  tokenClient._cid=cid;
-  return tokenClient;
-}
+/* ---------- GitHub API ---------- */
 function authErr(msg){ const e=new Error(msg); e.needAuth=true; return e; }
 
-async function ensureToken(interactive){
-  const now=Date.now();
-  if(gToken && gExp>now) return gToken;
-  const st=lsGet(LS_TOKEN,null);
-  if(st && st.token && st.exp>now){ gToken=st.token; gExp=st.exp; return gToken; }
-  if(!interactive && !lsGet(LS_CONNECTED,false)) throw authErr('尚未連結雲端硬碟');
-  if(!interactive && silentAuthBlocked) throw authErr('授權已過期，請點一下「立即同步」重新登入');
-  const tc=await initTokenClient();
-  return new Promise((resolve,reject)=>{
-    pendingAuth={resolve,reject,interactive:!!interactive};
-    try{ tc.requestAccessToken({prompt:''}); }
-    catch(e){
-      pendingAuth=null;
-      if(!interactive) silentAuthBlocked=true;
-      reject(authErr('無法開啟 Google 授權視窗（可能被瀏覽器擋住彈出視窗）'));
-    }
-  });
-}
-function gRevoke(){
-  try{ if(gToken && window.google && google.accounts && google.accounts.oauth2) google.accounts.oauth2.revoke(gToken, ()=>{}); }catch(e){}
-  gToken=null; gExp=0; gFileId=null; gEmail='';
-}
-function disconnect(){
-  if(!confirm('中斷與雲端硬碟的連結？\n這台電腦的紀錄會留著，雲端硬碟上的檔案也不會刪除。')) return;
-  gRevoke();
-  [LS_TOKEN, LS_CONNECTED, LS_EMAIL, LS_FILEID].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
-  setSyncUI(); toast('已中斷連結');
-}
-
-/* ---------- Drive API ---------- */
-async function driveFetch(url, opts, retried){
-  const t=await ensureToken(false);
+async function ghFetch(path, opts){
+  const t=ghToken();
+  if(!t) throw authErr('尚未填入 GitHub token');
   opts=Object.assign({}, opts||{});
-  opts.headers=Object.assign({}, opts.headers||{}, {Authorization:'Bearer '+t});
-  const r=await fetch(url, opts);
-  if((r.status===401||r.status===403) && !retried){
-    gToken=null; gExp=0; try{ localStorage.removeItem(LS_TOKEN); }catch(e){}
-    return driveFetch(url, opts, true);
+  opts.headers=Object.assign({
+    'Authorization':'Bearer '+t,
+    'Accept':'application/vnd.github+json',
+    'X-GitHub-Api-Version':'2022-11-28'
+  }, opts.headers||{});
+  let r;
+  try{ r=await fetch(GH_API+path, opts); }
+  catch(e){ throw new Error('連不上 GitHub（網路或防火牆）'); }
+  if(r.status===401) throw authErr('token 無效或已被撤銷，請重新產生一組');
+  if(r.status===403 || r.status===404){
+    const b=await r.text().catch(()=>'');
+    if(/rate limit/i.test(b)) throw new Error('GitHub API 次數上限，等幾分鐘再試');
+    throw authErr('token 沒有 gist 權限（產生 token 時要勾選 gist）');
   }
   if(!r.ok){
-    const body=await r.text().catch(()=>'');
-    const e=new Error('Drive '+r.status+'：'+String(body).slice(0,140));
-    if(r.status===401||r.status===403) e.needAuth=true;
+    const b=await r.text().catch(()=>'');
+    const e=new Error('GitHub '+r.status+'：'+String(b).slice(0,120));
     e.status=r.status; throw e;
   }
   return r;
 }
-async function gdFind(){
-  const q=encodeURIComponent("name='"+GD_NAME+"' and trashed=false");
-  const r=await driveFetch('https://www.googleapis.com/drive/v3/files?q='+q+'&spaces=drive&pageSize=5&fields=files(id,modifiedTime)');
-  const j=await r.json();
-  const f=(j.files||[])[0];
-  return f? f.id : null;
-}
-async function gdRead(id){
+async function fetchLogin(){
   try{
-    const r=await driveFetch('https://www.googleapis.com/drive/v3/files/'+id+'?alt=media');
-    const t=await r.text();
-    return t? JSON.parse(t) : null;
-  }catch(e){
-    if(e.status===404){ gFileId=null; try{ localStorage.removeItem(LS_FILEID); }catch(x){} return null; }
-    throw e;
-  }
+    const r=await ghFetch('/user');
+    const j=await r.json();
+    ghLogin=j.login||''; lsSet(LS_LOGIN, ghLogin); setSyncUI();
+  }catch(e){}
 }
-async function gdCreate(body){
-  const b='cvconsult'+Date.now();
-  const metaPart=JSON.stringify({name:GD_NAME, mimeType:'application/json',
-                                 description:'心肺照會病歷產生器：跨裝置同步檔（請勿手動改動）'});
-  const payload='--'+b+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+metaPart+
-                '\r\n--'+b+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+body+
-                '\r\n--'+b+'--';
-  const r=await driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-    {method:'POST', headers:{'Content-Type':'multipart/related; boundary='+b}, body:payload});
+/* 換裝置時用檔名 + 描述把之前那個 gist 找回來 */
+async function gistFind(){
+  const r=await ghFetch('/gists?per_page=100');
+  const list=await r.json();
+  const hit=(list||[]).find(g=> g && g.files && g.files[GIST_FILE]);
+  return hit? hit.id : null;
+}
+async function gistRead(id){
+  let r;
+  try{ r=await ghFetch('/gists/'+id); }
+  catch(e){ if(e.status===404 || /gist 權限|找不到/.test(e.message)) return null; throw e; }
+  const j=await r.json();
+  const f=j.files && j.files[GIST_FILE];
+  if(!f) return null;
+  let text=f.content;
+  if(f.truncated && f.raw_url){                       /* 超過 1MB 時 API 只給網址 */
+    const rr=await fetch(f.raw_url);
+    text=await rr.text();
+  }
+  try{ return JSON.parse(text); }catch(e){ throw new Error('雲端檔案內容壞掉，無法解析'); }
+}
+async function gistCreate(body){
+  const files={}; files[GIST_FILE]={content:body};
+  const r=await ghFetch('/gists', {method:'POST', body:JSON.stringify({description:GIST_DESC, public:false, files:files})});
   const j=await r.json();
   return j.id;
 }
-async function gdWrite(id, body){
-  await driveFetch('https://www.googleapis.com/upload/drive/v3/files/'+id+'?uploadType=media',
-    {method:'PATCH', headers:{'Content-Type':'application/json; charset=UTF-8'}, body:body});
+async function gistWrite(id, body){
+  const files={}; files[GIST_FILE]={content:body};
+  await ghFetch('/gists/'+id, {method:'PATCH', body:JSON.stringify({description:GIST_DESC, files:files})});
 }
-async function fetchEmail(){
-  try{
-    const r=await driveFetch('https://www.googleapis.com/oauth2/v3/userinfo');
-    const j=await r.json();
-    gEmail=j.email||''; lsSet(LS_EMAIL, gEmail); setSyncUI();
-  }catch(e){}
+function forgetToken(){
+  gistId=null; ghLogin='';
+  [LS_TOKEN, LS_CONNECTED, LS_LOGIN, LS_GISTID].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+}
+function disconnect(){
+  if(!confirm('中斷同步？\n這台電腦會忘記 token，本機紀錄會留著，Gist 上的資料也不會刪除。')) return;
+  forgetToken();
+  if(elTok) elTok.value='';
+  setSyncUI(); toast('已中斷連結');
 }
 
 /* ---------- 同步主流程 ---------- */
 async function syncNow(opts){
   opts=opts||{};
   if(syncing) return;
-  if(!gClientId()){
+  if(!ghToken()){
     setSyncUI('nocfg');
-    if(!opts.silent){ openDrawer(); $('syncBox').open=true; toast('請先在「雲端同步」裡設定用戶端 ID'); }
+    if(!opts.silent){ openDrawer(); $('syncBox').open=true; if(elTok) elTok.focus(); toast('請先貼上 GitHub token'); }
     return;
   }
   if(!navigator.onLine){ setSyncUI('offline'); if(!opts.silent) toast('目前沒有網路，等一下會自動再試'); return; }
   syncing=true; lastSyncTry=Date.now(); setSyncUI('busy');
   try{
-    await ensureToken(!!opts.interactive);
-    let id = gFileId || lsGet(LS_FILEID,null) || await gdFind();
-    let remote = id? await gdRead(id) : null;
-    if(id && !remote) id=null;                       /* 檔案被刪掉了 → 重建 */
+    let id = gistId || lsGet(LS_GISTID,null) || await gistFind();
+    let remote = id? await gistRead(id) : null;
+    if(id && !remote) id=null;                       /* Gist 被刪掉了 → 重建 */
     const rRecs = (remote && Array.isArray(remote.records))? remote.records : [];
     const rDels = (remote && Array.isArray(remote.deleted))? remote.deleted : [];
     const tombs = pruneTombs(mergeTombs(loadTombs(), rDels));
     const merged= mergeRecords(RECS, rRecs, tombs);
     const body  = JSON.stringify({app:'cv-consult', v:1, updatedAt:new Date().toISOString(),
-                                  records:merged, deleted:tombs});
-    if(id) await gdWrite(id, body); else id=await gdCreate(body);
-    gFileId=id; lsSet(LS_FILEID,id); saveTombs(tombs);
+                                  records:merged, deleted:tombs}, null, 1);
+    if(id) await gistWrite(id, body); else id=await gistCreate(body);
+    gistId=id; lsSet(LS_GISTID,id); lsSet(LS_CONNECTED,true); saveTombs(tombs);
     const before=RECS.length;
     RECS=merged; persist(); lsSet(LS_LASTSYNC, new Date().toISOString());
     setSyncUI('ok'); render(); renderRecList();
+    if(!ghLogin) fetchLogin();
     if(!opts.silent) toast('已同步：共 '+merged.length+' 筆'+(merged.length!==before? '（本機 '+before+' → '+merged.length+'）':''));
   }catch(e){
     setSyncUI(e && e.needAuth? 'needauth':'error', e && e.message);
-    if(!opts.silent) toast(e && e.needAuth? '請按「連結雲端硬碟」重新登入' : ('同步失敗：'+((e&&e.message)||'未知錯誤')));
+    if(!opts.silent) toast('同步失敗：'+((e&&e.message)||'未知錯誤'));
   }finally{
     syncing=false;
   }
@@ -1287,58 +1233,54 @@ function syncSoon(){
   clearTimeout(syncTimer);
   syncTimer=setTimeout(()=>syncNow({silent:true}), 2500);
 }
-async function connectDrive(){
-  const cid=gClientId();
-  if(!cid){ $('syncBox').open=true; elGid.focus(); toast('請先貼上 OAuth 用戶端 ID'); return; }
-  try{
-    setSyncUI('busy');
-    await initTokenClient();
-    await ensureToken(true);
-    await fetchEmail();
-    await syncNow({interactive:true});
-  }catch(e){
-    setSyncUI('error', e && e.message);
-    toast('連結失敗：'+((e&&e.message)||'未知錯誤'));
-  }
+async function connectGist(){
+  const v=elTok? elTok.value.trim() : '';
+  if(v) lsSet(LS_TOKEN, v);
+  if(!ghToken()){ $('syncBox').open=true; if(elTok) elTok.focus(); toast('請先貼上 GitHub token'); return; }
+  setSyncUI('busy');
+  await fetchLogin();
+  await syncNow({interactive:true});
 }
 
 /* ---------- 同步狀態顯示 ---------- */
 function setSyncUI(kind, msg){
-  const cid=gClientId();
-  gEmail = gEmail || String(lsGet(LS_EMAIL,'')||'');
+  const tok=ghToken();
+  ghLogin = ghLogin || String(lsGet(LS_LOGIN,'')||'');
+  gistId  = gistId  || lsGet(LS_GISTID,null);
   const last=lsGet(LS_LASTSYNC,null);
   const lastTxt = last? ('上次同步 '+fmtTime(last)) : '尚未同步過';
-  if(kind===undefined) kind = !cid? 'nocfg' : (isConnected()? (last?'ok':'idle') : 'idle');
-  let chip='未連結雲端', cls='', st='未連結';
-  if(kind==='nocfg'){ chip='雲端未設定'; cls=''; st='還沒設定 OAuth 用戶端 ID'; }
+  const who = ghLogin? '（'+ghLogin+'）' : '';
+  if(kind===undefined) kind = !tok? 'nocfg' : (isConnected()? (last?'ok':'idle') : 'idle');
+  let chip='未連結同步', cls='', st='未連結';
+  if(kind==='nocfg'){ chip='同步未設定'; st='還沒填入 GitHub token'; }
   else if(kind==='busy'){ chip='同步中…'; cls='busy'; st='同步中…'; }
-  else if(kind==='ok'){ chip='已同步'; cls='ok'; st='已連結'+(gEmail? '（'+gEmail+'）':'')+'　'+lastTxt; }
-  else if(kind==='needauth'){ chip='需重新登入'; cls='warn'; st='需要重新登入：'+(msg||'授權已過期'); }
+  else if(kind==='ok'){ chip='已同步'; cls='ok'; st='已連結'+who+'　'+lastTxt; }
+  else if(kind==='needauth'){ chip='token 有問題'; cls='warn'; st=msg||'token 無效，請重新產生一組貼上'; }
   else if(kind==='offline'){ chip='離線'; cls='warn'; st='目前沒有網路，恢復連線後會自動同步　'+lastTxt; }
   else if(kind==='error'){ chip='同步失敗'; cls='err'; st='同步失敗：'+(msg||'未知錯誤')+'　'+lastTxt; }
   else { /* idle */
-    if(isConnected()){ chip='已連結'; cls='ok'; st='已連結'+(gEmail? '（'+gEmail+'）':'')+'　'+lastTxt; }
-    else { chip='未連結雲端'; cls=''; st='尚未連結（目前只存在這台電腦）'; }
+    if(isConnected()){ chip='已連結'; cls='ok'; st='已連結'+who+'　'+lastTxt; }
+    else { chip='未連結同步'; st='尚未連結（目前只存在這台電腦）'; }
   }
   elChipText.textContent=chip;
   elChip.className='sync-chip '+cls;
   elSyncStatus.textContent=st;
-  if(elGid && document.activeElement!==elGid) elGid.value=String(lsGet(LS_GID,'')||'');
-  if(elGidRow) elGidRow.style.display = (GOOGLE_CLIENT_ID||'').trim()? 'none':'';
+  if(elTok && document.activeElement!==elTok && !elTok.value) elTok.value=String(lsGet(LS_TOKEN,'')||'');
+  if(elTokRow) elTokRow.style.display = (GH_TOKEN_PRESET||'').trim()? 'none':'';
   if(elAuto) elAuto.checked=autoOn();
+  if(elGistLink){
+    if(gistId){ elGistLink.href='https://gist.github.com/'+gistId; elGistLink.style.display=''; }
+    else elGistLink.style.display='none';
+  }
 }
 
 /* ---------- 事件綁定 ---------- */
 elChip.addEventListener('click', ()=>{ openDrawer(); $('syncBox').open=true; });
-$('gConnect').addEventListener('click', connectDrive);
+$('gConnect').addEventListener('click', connectGist);
 $('gSyncNow').addEventListener('click', ()=>syncNow({interactive:true}));
 $('gDisconnect').addEventListener('click', disconnect);
 $('wipeDevice').addEventListener('click', wipeDevice);
-$('gidSave').addEventListener('click', ()=>{
-  const v=elGid.value.trim();
-  lsSet(LS_GID, v); tokenClient=null;
-  setSyncUI(); toast(v? '已儲存用戶端 ID，接著按「連結雲端硬碟」':'已清除用戶端 ID');
-});
+if(elTok) elTok.addEventListener('keydown', e=>{ if(e.key==='Enter') connectGist(); });
 elAuto.addEventListener('change', ()=>{ lsSet(LS_AUTO, elAuto.checked); setSyncUI(); if(elAuto.checked) syncSoon(); });
 window.addEventListener('online', ()=>{ if(isConnected()) syncNow({silent:true}); });
 document.addEventListener('visibilitychange', ()=>{
@@ -1382,13 +1324,6 @@ if(_draft && _draft.snap){
 }
 render();
 renderRecList();
-/* 設定說明裡直接顯示這個網站真正的來源，照抄貼進 Google Cloud 就不會填錯 */
-(function(){
-  const h=$('syncHelp'); if(!h) return;
-  const o=(location.protocol==='http:'||location.protocol==='https:')? location.origin
-        : '（要先把網站放上 GitHub Pages 才有來源可填；用檔案直接開的網頁沒辦法做 Google 登入）';
-  h.textContent=h.textContent.replace(/\{ORIGIN\}/g, o);
-})();
 setSyncUI();
 if(isConnected()) syncNow({silent:true});   /* 已登入過就靜靜地把其他裝置的更新拉回來 */
 </script>
