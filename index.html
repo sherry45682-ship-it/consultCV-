@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>心肺照會病歷產生器</title>
+<style>
+  :root{
+    --ink:#1a2530; --ink-soft:#4a5a6b; --line:#d9e0e6; --line-soft:#eaeef1;
+    --paper:#fff; --wash:#f4f7f9; --blue:#2f6d8f; --blue-deep:#245570;
+    --blue-wash:#e6f0f4; --amber:#b5751f; --amber-wash:#faf1e2; --off:#eef2f4;
+    --sel:#2f6d8f; --radius:7px;
+    --mono:ui-monospace,"SFMono-Regular","Menlo","Consolas","Roboto Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--wash);font-size:14px;line-height:1.5}
+  .app{display:grid;grid-template-columns:1fr 420px;min-height:100vh}
+  .form{padding:22px 26px 120px;max-width:900px}
+  header.top{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px;border-bottom:2px solid var(--ink);padding-bottom:12px}
+  header.top h1{font-size:19px;font-weight:700;margin:0}
+  header.top h1 .en{font-weight:500;color:var(--ink-soft);font-size:14px}
+  header.top .sub{font-size:12.5px;color:var(--ink-soft)}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 20px}
+  .toolbar button{font-family:var(--sans);font-size:12.5px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);padding:6px 12px;border-radius:6px;cursor:pointer}
+  .toolbar button:hover{border-color:var(--blue);color:var(--blue)}
+  .block{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);margin-bottom:14px;overflow:hidden}
+  .block-head{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;user-select:none}
+  .block-head .name{font-weight:700;font-size:14.5px;flex:1}
+  .block-head .name .en{color:var(--ink-soft);font-weight:500;font-size:12.5px;margin-left:7px}
+  .chev{color:var(--ink-soft);font-size:11px;flex:none;transition:transform .15s}
+  .block.collapsed .chev{transform:rotate(-90deg)}
+  .block-body{padding:2px 14px 15px}
+  .block.collapsed .block-body{display:none}
+  .row{padding:8px 0;border-top:1px solid var(--line-soft)}
+  .row:first-child{border-top:none}
+  .row-label{font-size:13px;margin-bottom:5px;font-weight:600}
+  .row-label .hint{font-weight:400;color:var(--ink-soft);font-size:12px;margin-left:6px}
+  .opts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .pill{font-family:var(--sans);font-size:12.5px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);padding:4px 11px;border-radius:20px;cursor:pointer;transition:.1s;line-height:1.4;text-align:left}
+  .pill:hover{border-color:var(--blue)}
+  .pill.on{background:var(--sel);border-color:var(--sel);color:#fff;font-weight:600}
+  .xbtn{flex:none;font-family:var(--sans);font-size:13px;line-height:1;width:26px;height:26px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-left:8px}
+  .xbtn:hover{border-color:#c0392b;color:#c0392b}
+  .xbtn.on{background:#c0392b;border-color:#c0392b;color:#fff}
+  .block.excluded{background:var(--off);opacity:.7}
+  .block.excluded .block-head .name,.block.excluded .block-head .en{opacity:.5;text-decoration:line-through}
+  .pill.overridden{opacity:.32;text-decoration:line-through}
+  .pill.overridden.on{background:var(--paper);border-color:var(--line);color:var(--ink-soft);font-weight:400}
+  select.sel{font-family:var(--sans);font-size:12.5px;border:1px solid var(--line);border-radius:6px;padding:5px 8px;background:var(--paper);color:var(--ink);max-width:100%;cursor:pointer}
+  select.sel:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-wash)}
+  select.sel.filled{border-color:var(--sel);color:var(--ink);font-weight:600}
+  select.sel.overridden{opacity:.35;text-decoration:line-through}
+  input.txt{font-family:var(--mono);font-size:12.5px;border:1px solid var(--line);border-radius:5px;padding:4px 7px;color:var(--ink);background:var(--paper)}
+  input.txt:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-wash)}
+  .w-xs{width:60px}.w-s{width:92px}.w-m{width:170px}.w-l{width:100%;max-width:440px}
+  .inline-lbl{font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .info{margin-top:6px}
+  .info summary{font-size:11.5px;color:var(--blue);cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px;padding:2px 0}
+  .info summary::-webkit-details-marker{display:none}
+  .info summary::before{content:"ⓘ";font-size:12px}
+  .info[open] summary{color:var(--ink-soft)}
+  .info .info-body{font-size:11.5px;color:var(--ink-soft);background:var(--amber-wash);border-left:3px solid var(--amber);padding:8px 11px;border-radius:0 5px 5px 0;margin-top:6px;white-space:pre-wrap;line-height:1.55}
+  .free-note{margin-top:10px}
+  .free-note .cap{font-size:11px;color:var(--ink-soft);margin-bottom:3px}
+  .free-note textarea{width:100%;font-family:var(--mono);font-size:12px;border:1px dashed var(--line);border-radius:5px;padding:7px;color:var(--ink);min-height:36px;resize:vertical;background:#fcfdfe}
+  .free-note textarea:focus{outline:none;border-color:var(--blue)}
+  .notebtn{font-family:var(--sans);font-size:11px;color:var(--ink-soft);border:1px dashed var(--line);background:var(--paper);padding:3px 8px;border-radius:20px;cursor:pointer;line-height:1.4}
+  .notebtn:hover{border-color:var(--blue);color:var(--blue)}
+  .notebtn.has{border-style:solid;border-color:var(--blue);color:var(--blue);background:var(--blue-wash)}
+  .notewrap{flex-basis:100%;margin-top:6px;display:none}
+  .notewrap.open{display:block}
+  .notewrap input{width:100%;max-width:460px;font-family:var(--mono);font-size:12px;border:1px solid var(--blue);border-radius:5px;padding:5px 8px;color:var(--ink);background:#fcfdfe}
+  .notewrap input:focus{outline:none;box-shadow:0 0 0 2px var(--blue-wash)}
+  .preview{position:sticky;top:0;align-self:start;height:100vh;border-left:1px solid var(--line);background:var(--paper);display:flex;flex-direction:column}
+  .pv-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .pv-head .t{font-weight:700;font-size:13.5px}
+  .pv-head .t small{font-weight:400;color:var(--ink-soft);font-size:11.5px;margin-left:6px}
+  .pv-actions button{font-family:var(--sans);font-size:12px;cursor:pointer;border-radius:6px;padding:6px 14px;border:1px solid var(--blue);background:var(--blue);color:#fff}
+  .pv-actions button:hover{background:var(--blue-deep)}
+  .pv-actions button.done{background:#2e7d5b;border-color:#2e7d5b}
+  .pv-body{flex:1;overflow:auto;padding:14px 16px}
+  #output{font-family:var(--mono);font-size:11.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;margin:0}
+  .pv-empty{color:var(--ink-soft);font-size:12.5px;padding:16px 0}
+  @media(max-width:900px){.app{grid-template-columns:1fr}.preview{position:static;height:auto;border-left:none;border-top:1px solid var(--line)}.pv-body{max-height:52vh}}
+
+  /* ================= 紀錄功能（records） ================= */
+  .metabar{border:1px solid var(--line);background:var(--paper);border-radius:var(--radius);padding:10px 12px;margin:0 0 14px}
+  .mb-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .mb-lb{font-size:12px;color:var(--ink-soft);font-weight:600}
+  .metabar input.txt{font-family:var(--sans);font-size:12.5px}
+  .mb-status{margin-left:auto;font-size:11.5px;color:var(--ink-soft);white-space:nowrap}
+  .mb-status.dirty{color:var(--amber);font-weight:700}
+  .mb-hint{font-size:11px;color:var(--ink-soft);margin-top:7px;line-height:1.55}
+  .toolbar button.primary{border-color:var(--blue);background:var(--blue);color:#fff}
+  .toolbar button.primary:hover{background:var(--blue-deep);color:#fff}
+  .toolbar button.warn{border-color:var(--amber);color:var(--amber);background:var(--amber-wash)}
+  .toolbar .sp{flex:1}
+  .pv-actions{display:flex;gap:6px}
+  .pv-actions button.ghost{background:var(--paper);color:var(--blue)}
+  .pv-actions button.ghost:hover{background:var(--blue-wash)}
+  .drawer-mask{position:fixed;inset:0;background:rgba(20,32,42,.35);display:none;z-index:40}
+  .drawer-mask.open{display:block}
+  .drawer{position:fixed;top:0;right:0;width:470px;max-width:94vw;height:100vh;background:var(--paper);
+          border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(20,32,42,.14);
+          transform:translateX(102%);transition:transform .18s ease;z-index:41;display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .dw-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .dw-title{font-weight:700;font-size:14px}
+  .dw-title small{font-weight:400;color:var(--ink-soft);font-size:11.5px;margin-left:6px}
+  .dw-x{font-family:var(--sans);font-size:14px;line-height:1;width:28px;height:28px;border:1px solid var(--line);
+        background:var(--paper);color:var(--ink-soft);border-radius:6px;cursor:pointer}
+  .dw-x:hover{border-color:var(--blue);color:var(--blue)}
+  .dw-tools{padding:10px 16px;border-bottom:1px solid var(--line-soft)}
+  .dw-tools input{width:100%;font-family:var(--sans);font-size:12.5px;border:1px solid var(--line);
+                  border-radius:6px;padding:6px 9px;color:var(--ink);background:var(--paper)}
+  .dw-tools input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-wash)}
+  .dw-list{flex:1;overflow:auto;padding:10px 12px;background:var(--wash)}
+  .dw-empty{color:var(--ink-soft);font-size:12.5px;padding:24px 8px;text-align:center;line-height:1.7}
+  .rec{border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-bottom:9px;background:var(--paper)}
+  .rec.cur{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-wash)}
+  .rec-top{display:flex;align-items:baseline;gap:8px}
+  .rec-title{font-weight:700;font-size:13px;flex:1;word-break:break-all}
+  .rec-title .tag{font-size:10.5px;font-weight:600;color:#fff;background:var(--blue);border-radius:10px;padding:1px 7px;margin-left:6px}
+  .rec-date{font-size:11px;color:var(--ink-soft);flex:none}
+  .rec-memo{font-size:11.5px;color:var(--ink-soft);margin-top:3px;white-space:pre-wrap;word-break:break-word}
+  .rec-prev{font-family:var(--mono);font-size:10.5px;line-height:1.5;color:var(--ink-soft);background:var(--wash);
+            border-radius:5px;padding:7px 8px;margin:7px 0 0;max-height:80px;overflow:hidden;white-space:pre-wrap;word-break:break-word}
+  .rec-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .rec-acts button,.dw-foot button{font-family:var(--sans);font-size:11.5px;border:1px solid var(--line);
+            background:var(--paper);color:var(--ink-soft);padding:4px 10px;border-radius:6px;cursor:pointer}
+  .rec-acts button:hover,.dw-foot button:hover{border-color:var(--blue);color:var(--blue)}
+  .rec-acts button.danger:hover,.dw-foot button.danger:hover{border-color:#c0392b;color:#c0392b}
+  .dw-foot{border-top:1px solid var(--line);padding:10px 16px;display:flex;gap:6px;flex-wrap:wrap}
+  .dw-hint{flex-basis:100%;font-size:11px;color:var(--ink-soft);line-height:1.55;margin-top:5px}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);background:var(--ink);color:#fff;
+         font-size:12.5px;padding:9px 18px;border-radius:20px;opacity:0;pointer-events:none;transition:.18s;z-index:60}
+  .toast.show{opacity:.96;transform:translateX(-50%)}
+
+  /* ================= 雲端同步（Google Drive） ================= */
+  .sync-chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-size:12.5px;color:var(--ink-soft);
+             border:1px solid var(--line);background:var(--paper);padding:6px 12px;border-radius:20px;cursor:pointer}
+  .sync-chip:hover{border-color:var(--blue);color:var(--blue)}
+  .sync-chip .dot{width:8px;height:8px;border-radius:50%;background:#b9c4cc;flex:none}
+  .sync-chip.ok   .dot{background:#2e7d5b}
+  .sync-chip.busy .dot{background:var(--blue);animation:pulse 1s infinite}
+  .sync-chip.warn .dot{background:var(--amber)}
+  .sync-chip.err  .dot{background:#c0392b}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+  .sync-box{border:1px solid var(--line);border-radius:var(--radius);margin:10px 12px 0;background:var(--paper)}
+  .sync-box>summary{list-style:none;cursor:pointer;font-size:12.5px;font-weight:700;padding:9px 12px}
+  .sync-box>summary::-webkit-details-marker{display:none}
+  .sync-box>summary::before{content:"\2601";margin-right:7px}
+  .sync-body{padding:2px 12px 12px;border-top:1px solid var(--line-soft)}
+  .sync-line{font-size:12px;color:var(--ink-soft);margin:9px 0;word-break:break-all}
+  .sync-line b{color:var(--ink)}
+  .sync-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:7px}
+  .sync-row input[type=text]{flex:1;min-width:190px;font-family:var(--mono);font-size:11.5px;border:1px solid var(--line);
+                             border-radius:6px;padding:5px 8px;color:var(--ink);background:var(--paper)}
+  .sync-row input[type=text]:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-wash)}
+  .sync-row button{font-family:var(--sans);font-size:11.5px;border:1px solid var(--line);background:var(--paper);
+                   color:var(--ink-soft);padding:5px 10px;border-radius:6px;cursor:pointer}
+  .sync-row button:hover{border-color:var(--blue);color:var(--blue)}
+  .sync-row button.go{border-color:var(--blue);background:var(--blue);color:#fff}
+  .sync-row button.go:hover{background:var(--blue-deep);color:#fff}
+  .sync-row button.danger:hover{border-color:#c0392b;color:#c0392b}
+  .sync-row label{font-size:11.5px;color:var(--ink-soft);display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+  .sync-help{font-size:11px;color:var(--ink-soft);line-height:1.65;background:var(--amber-wash);border-left:3px solid var(--amber);
+             padding:9px 11px;border-radius:0 5px 5px 0;margin-top:8px;white-space:pre-wrap}
+  .sync-help a{color:var(--blue)}
+  @media(max-width:900px){.drawer{width:100%}.mb-status{margin-left:0;flex-basis:100%}}
+</style>
+<!-- Google Identity Services：取得存取權杖用（沒有網路或未設定時，整個工具仍可純本機使用） -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+<div class="app">
+  <div class="form">
+    <header class="top">
+      <h1>心肺照會病歷產生器 <span class="en">Cardiopulmonary Consultation</span></h1>
+      <span class="sub">第一段依新模板；未選的欄位預設保留模板空白格 → 右側即時產出純文字</span>
+    </header>
+    <div class="toolbar">
+      <button id="saveRec" class="primary">＋ 存成新紀錄</button>
+      <button id="updateRec" class="warn" hidden>更新此紀錄</button>
+      <button id="openRecs">紀錄清單 <span id="recCount">(0)</span></button>
+      <button class="sync-chip" id="syncChip" title="雲端同步狀態（點一下開啟同步設定）"><i class="dot"></i><span id="syncText">未連結雲端</span></button>
+      <span class="sp"></span>
+      <button id="collapseAll">收合全部</button>
+      <button id="expandAll">展開全部</button>
+      <button id="blankMode">未填欄位：保留空白格</button>
+      <button id="resetAll">清空重填</button>
+    </div>
+
+    <div class="metabar">
+      <div class="mb-row">
+        <span class="mb-lb">紀錄標題</span>
+        <input id="metaTitle" class="txt w-m" type="text" placeholder="床號／代號（例：8B-12 CABG）">
+        <span class="mb-lb">日期</span>
+        <input id="metaDate" class="txt w-m" type="date">
+        <span class="mb-lb">備註</span>
+        <input id="metaMemo" class="txt w-m" type="text" placeholder="自用備註，不會進入病歷">
+        <span class="mb-status" id="draftStatus">草稿自動保存中</span>
+      </div>
+      <div class="mb-hint">每次填完按「存成新紀錄」就留下一筆；目前內容會自動存成草稿，下次打開自動接續。紀錄預設只存在這台電腦的瀏覽器，連結 Google 雲端硬碟後才會同步到你自己的雲端硬碟。建議標題只寫床號或代號，不要填姓名與病歷號。</div>
+    </div>
+
+    <div id="sections"></div>
+  </div>
+  <aside class="preview">
+    <div class="pv-head">
+      <div class="t">病歷預覽 <small>純文字</small></div>
+      <div class="pv-actions"><button id="saveQuick" class="ghost">存成紀錄</button><button id="copyBtn">複製</button></div>
+    </div>
+    <div class="pv-body">
+      <pre id="output"></pre>
+      <div class="pv-empty" id="pvEmpty">左側全部取消後這裡就會空白。<br>沒有點到的項目一律不會出現在病歷。</div>
+    </div>
+  </aside>
+</div>
+
+<div class="drawer-mask" id="recMask"></div>
+<aside class="drawer" id="recDrawer" aria-hidden="true">
+  <div class="dw-head">
+    <div class="dw-title">紀錄清單 <small id="dwCount"></small></div>
+    <button class="dw-x" id="recClose" title="關閉">✕</button>
+  </div>
+  <details class="sync-box" id="syncBox">
+    <summary>雲端同步（Google 雲端硬碟）</summary>
+    <div class="sync-body">
+      <div class="sync-line"><b>狀態：</b><span id="syncStatusText">未連結</span></div>
+      <div class="sync-row" id="gidRow">
+        <input id="gidInput" type="text" placeholder="貼上 OAuth 用戶端 ID（....apps.googleusercontent.com）">
+        <button id="gidSave">儲存</button>
+      </div>
+      <div class="sync-row">
+        <button id="gConnect" class="go">連結雲端硬碟</button>
+        <button id="gSyncNow">立即同步</button>
+        <label><input type="checkbox" id="gAuto" checked> 自動同步</label>
+        <button id="gDisconnect" class="danger">中斷連結</button>
+      </div>
+      <div class="sync-help" id="syncHelp">第一次設定（只要做一次，之後每台裝置只需登入同一個 Google 帳號）：
+1. 到 Google Cloud Console 建立專案 → 「API 和服務」→「OAuth 同意畫面」，User type 選 External，把自己的 Gmail 加進 Test users。
+2. 「憑證」→ 建立憑證 →「OAuth 用戶端 ID」→ 應用程式類型選「網頁應用程式」。
+3. 「已授權的 JavaScript 來源」填入這一行（就是這個網站的來源，不含路徑）：{ORIGIN}
+4. 複製產生的用戶端 ID，貼到上面欄位按「儲存」，再按「連結雲端硬碟」。
+權限只要求 drive.file：這個程式只能讀寫它自己建立的那一個檔案，看不到你雲端硬碟裡其他東西。資料會存成雲端硬碟裡的 cv_consult_records.json。</div>
+    </div>
+  </details>
+  <div class="dw-tools">
+    <input id="recSearch" type="text" placeholder="搜尋標題／備註／病歷內容">
+  </div>
+  <div class="dw-list" id="recList"></div>
+  <div class="dw-foot">
+    <button id="expJson">匯出 JSON（備份）</button>
+    <button id="expCsv">匯出 CSV</button>
+    <button id="impJson">匯入 JSON</button>
+    <button id="clearAllRecs" class="danger">刪除全部紀錄</button>
+    <button id="wipeDevice" class="danger">離開這台電腦</button>
+    <input type="file" id="impFile" accept="application/json,.json" hidden>
+    <div class="dw-hint">紀錄儲存在本機瀏覽器（localStorage），連結雲端硬碟後會同步到你自己的 Google 雲端硬碟。<br>「刪除全部紀錄」＝連雲端的也一起刪掉；在公用電腦用完只要按「離開這台電腦」（登出並清掉這台機器的本機資料，雲端保留）。</div>
+  </div>
+</aside>
+<div class="toast" id="toast"></div>
+<script>
+/* ============================================================
+   MODEL — 與 CVA admission 工具同一套設計邏輯
+   Field types:
+     pick   {label,key,opts,def?,info?}      單選（點第二次取消）
+     multi  {label,key,opts,def?,sep?}       複選（依點選順序串接）
+     select {label,key,opts,def?,ph?}        下拉式選單
+     text   {label,key,ph?,w?,def?}          手動輸入
+     pair   {label,key,def?,ph?,w?}          兩格輸入
+   每個 pick/multi/select 都自帶「其他」按鈕：輸入文字會「取代」該項目的選項值。
+   info 只顯示在畫面上，永遠不會進入輸出。
+   ============================================================ */
+const YN   = ["是","否"];              /* 是／否 */
+const YW   = ["有","無"];              /* 有／無 */
+const FLOORS = ["1","2","3","4","5","6","7","8","9","10"];
+
+/* 本段選項（完全依新模板） */
+const CITY     = ["台北市","新北市","基隆市","桃園市","北北基桃以外"];
+const WORKTYPE = ["辦公室工作","勞力工作"];
+const MOBILITY = ["不需輔具即可步行","使用輔具步行","主要使用輪椅","長期臥床"];
+const BADL     = ["完全獨立","部分依賴","完全依賴"];
+
+/* 選了「無法取得資料」時，其餘欄位自動隱藏 */
+const NOD = (st)=> !!(st.fields['nodata'] || (st.fother['nodata'] && String(st.fother['nodata']).trim()));
+
+const MODEL = [
+
+/* ================= 開頭固定文字（無標題、不需填寫） ================= */
+{ id:"intro", name:"Consultation opening", en:"開頭固定文字", bare:true, fields:[
+  {type:"static", label:"固定內容（不需填寫，直接輸出於病歷最上方）",
+   info:"A -year-old male patient with\n[Active]\n[Resolved]\n[Underlying]\n \nWe are consulted for rehabilitation;\n\n本段不加 # 標題、也不加 ` 。不需要時點右上角 ✕ 排除；要加內容請用下方「補充」。"}
+]},
+
+/* ================= PREMORBID FUNCTIONAL STATUS ================= */
+{ id:"pre", name:"Premorbid functional status", en:"病前生活與功能狀態",
+  outName:"Premorbid functional status 病前生活與功能狀態", raw:true, preset:true, fields:[
+
+  {type:"pick", label:"無法取得病前資料", key:"nodata", opts:["無法取得"],
+   info:"點下去之後，本段只會輸出：\nFailed to obtain premorbid information from the patient or caregiver.\n下方所有欄位會自動隱藏；再點一次即取消。"},
+
+  /* ---- Living environment ---- */
+  {type:"pick", label:"居住地 — 市／縣", key:"city", opts:CITY, hideWhen:NOD,
+   info:"輸出：•\t居住地：台北市 大安區\n選「北北基桃以外」時只會輸出：居住地：北北基桃以外\n其他縣市請按「其他」直接輸入。"},
+  {type:"text", label:"居住地 — 區／鄉／鎮／市", key:"dist", ph:"大安區", w:"m",
+   hideWhen:(st)=> NOD(st) || String(st.fother['city']||st.fields['city']||'')==='北北基桃以外'},
+  {type:"select", label:"住家 — 樓層", key:"floor", opts:FLOORS, ph:"—（未選＝____樓）", hideWhen:NOD,
+   info:"輸出：•\t住家：5樓；電梯：有\n非 1–10 樓請按「其他」直接輸入完整文字（例：B1樓、5樓之1）。"},
+  {type:"pick", label:"住家 — 電梯", key:"elevator", opts:YW, hideWhen:NOD},
+
+  /* ---- Occupation ---- */
+  {type:"pick", label:"平日白天需工作", key:"work", def:"是", opts:YN, hideWhen:NOD},
+  {type:"pick", label:"工作型態", key:"worktype", def:"辦公室工作", opts:WORKTYPE, hideWhen:NOD},
+
+  /* ---- Premorbid functional status ---- */
+  {type:"pick", label:"住院前能獨自至臺大醫院門診就醫", key:"opdAlone", def:"是", opts:YN, hideWhen:NOD},
+  {type:"pick", label:"住院前能連續步行至少5分鐘", key:"walk5", def:"是", opts:YN, hideWhen:NOD},
+  {type:"pick", label:"行動能力", key:"mobility", def:"不需輔具即可步行", opts:MOBILITY, hideWhen:NOD,
+   info:"未選時保留模板原句：行動能力： □ 不需輔具即可步行 □ 使用輔具步行 □ 主要使用輪椅 □ 長期臥床"},
+  {type:"pick", label:"基本日常生活功能（BADLs）", key:"badl", def:"完全獨立", opts:BADL, hideWhen:NOD},
+
+  /* ---- Exercise habits ---- */
+  {type:"pick", label:"住院前有規律運動習慣（每週至少2次）", key:"exercise", def:"無", opts:YW, hideWhen:NOD},
+
+  /* ---- Digital readiness ---- */
+  {type:"pick", label:"平時有使用LINE", key:"line", def:"是", opts:YN, hideWhen:NOD},
+  {type:"pick", label:"能自行掃描QR Code", key:"qr", def:"是", opts:YN, hideWhen:NOD},
+  {type:"pick", label:"能自行使用網路掛號", key:"reg", def:"是", opts:YN, hideWhen:NOD}
+]},
+
+/* ================= BRIEF SUMMARY（固定預設文字，不需填寫） ================= */
+{ id:"brief", name:"Brief summary", en:"簡要摘要", fields:[
+  {type:"static", label:"固定內容（不需填寫，直接輸出）",
+   info:"EKG:\nCardiac echo: LVEF %\nCAG:\nLab data\nCardiac enzymes: peaked level of Troponin T and CK level passed\nCurrent condition: No newly onset or recurrent chest pain in past 8 hours.\n\n不需要這段時，點右上角的 ✕ 排除。要加內容請用下方「補充」。"}
+]},
+
+/* ================= PHYSICAL EXAMINATION ================= */
+{ id:"pe", name:"Physical examination", en:"理學檢查", preset:true, fields:[
+  {type:"pick", label:"Vital signs", key:"vital", def:"stable, no fever",
+   opts:["stable, no fever","stable, low-grade fever","febrile, up to 38.5°C",
+         "tachycardia noted, blood pressure stable","unstable, under inotropic agent support"]},
+  {type:"pick", label:"Oxygen demand", key:"o2", def:"97%, room air",
+   opts:["97%, room air","95%, room air","98% under nasal cannula 3 L/min",
+         "96% under simple mask 5 L/min","under high-flow nasal cannula","under ventilator support"]},
+  {type:"pick", label:"Consciousness", key:"cons", def:"clear and oriented",
+   opts:["clear and oriented","drowsy but arousable","confused, disoriented to time and place",
+         "sedated under ventilator support","comatose"]},
+  {type:"pick", label:"Breathing pattern", key:"bp", def:"smooth",
+   opts:["smooth","tachypneic","labored, with accessory muscle use",
+         "shallow and rapid","paradoxical breathing pattern"]},
+  {type:"pick", label:"Breath sound", key:"bs", def:"clear",
+   opts:["clear","coarse","bilateral basal crackles",
+         "decreased at bilateral lower lung fields","expiratory wheezing"]},
+  {type:"pick", label:"Lung expansion", key:"lung", def:"good",
+   opts:["good","fair","decreased over right lower chest",
+         "decreased over left lower chest","poor, with limited chest wall mobility"]},
+  {type:"pick", label:"Cough ability", key:"cough", def:"functional",
+   opts:["functional","weak but functional","nonfunctional, suction dependent",
+         "dry, nonproductive","productive with whitish sputum"]},
+  {type:"pick", label:"Wound", key:"wound", def:"fair",
+   opts:["fair","NA","sternotomy wound, dry and clean","right groin puncture wound, no hematoma",
+         "left groin puncture wound, no hematoma","surgical wound with mild oozing",
+         "chest tube wound, clean without discharge"]},
+  {type:"multi", label:"Tube（可複選，以 / 串接）", key:"tube", def:["nil"], sep:"/",
+   opts:["nil","Foley","sheath","NG tube","CVC","chest tube","endotracheal tube","tracheostomy tube"]},
+  {type:"pick", label:"Muscle power — 配合度", key:"mpCoop", def:"cooperative",
+   opts:["cooperative","poor cooperation","fair cooperation"]},
+  {type:"pick", label:"Muscle power — 肌力", key:"mpWeak", def:"no focal weakness",
+   opts:["no focal weakness","mild weakness of four limbs (MP 4/4)",
+         "mild weakness of bilateral lower limbs (MP 4/4)","weakness of bilateral upper limbs (MP 4/4)",
+         "generalized weakness (MP 3/3)"],
+   info:"輸出格式：Muscle power: cooperative, no focal weakness"},
+  {type:"pick", label:"Sensation", key:"sens", def:"grossly intact",
+   opts:["grossly intact","decreased over bilateral distal limbs","not testable due to poor cooperation"]},
+  {type:"pick", label:"Functional status", key:"func", def:"bedrest",
+   opts:["bedrest","ward walking without assistance or device","ward walking with assistance",
+         "ward walking with assistive device","ward walking with walker"]},
+  {type:"pick", label:"能獨自步行 > 1 分鐘", key:"walk1", def:"no", opts:["yes","no"],
+   info:"輸出接在 Functional status 下一行：\n能獨自步行 > 1 分鐘: yes"},
+  {type:"pick", label:"BADLs", key:"badl2", def:"partially dependent",
+   opts:["totally independent","partially dependent","totally dependent"]}
+]},
+
+/* ================= 病人意願 ================= */
+{ id:"will", name:"病人意願", en:"Patient willingness", outName:"病人意願", preset:true, fields:[
+  {type:"pick", label:"1.心肺復健", key:"rehab", def:"考慮", opts:["考慮","不想參加"],
+   info:"選「考慮」時，第 2 題自動隱藏且不輸出。"},
+  {type:"pick", label:"2.諮詢", key:"consult", opts:["考慮","不想參加"],
+   hideWhen:(st)=> String(st.fother['rehab'] || st.fields['rehab'] || '')==='考慮'}
+]}
+
+];
+</script>
+<script>
+/* =========================================================================
+   app.js — 渲染 MODEL、處理互動、產生純文字（與 CVA admission 相同架構）
+   ========================================================================= */
+const state = {};
+let KEEP_BLANK = true;   /* 未填欄位：保留模板空白格（預設）／不輸出 */
+const pillSyncers = {};
+const rowRefreshers = [];
+const oV = o => (o && typeof o==='object')? o.v : o;                 // 進病歷的值
+const oL = o => (o && typeof o==='object')? (o.v+'  （'+o.zh+'）') : o; // 畫面上看到的（含中文）
+try{ window.state = state; }catch(e){}
+const OUT = document.getElementById('output');
+const EMPTY = document.getElementById('pvEmpty');
+
+MODEL.forEach(s => {
+  const st={notes:"", fields:{}, fnotes:{}, fother:{}, excluded:false};
+  if(s.preset){
+    s.fields.forEach(f=>{
+      if(f.def===undefined) return;
+      if(Array.isArray(f.def)) st.fields[f.key]=f.def.map(oV);
+      else if(f.type==='pair' && f.def && typeof f.def==='object') st.fields[f.key]={a:f.def.a||"",b:f.def.b||""};
+      else st.fields[f.key]=f.def;
+    });
+  }
+  state[s.id]=st;
+});
+/* 預設值快照：給「清空重填」用（此時還沒任何使用者輸入） */
+const DEFAULT_STATE = JSON.parse(JSON.stringify(state));
+
+/* ---------- render ---------- */
+const root = document.getElementById('sections');
+function el(tag, cls, txt){const e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e;}
+
+/* 共用的「其他」覆寫（輸入文字會取代該項目的選項值） */
+function addOther(host, secId, key, marks){
+  const nbtn=el('button','notebtn','其他');
+  const nwrap=el('div','notewrap');
+  const ninp=el('input'); ninp.type='text'; ninp.placeholder='輸入其他內容（會取代此項的選項）';
+  const apply=()=>{
+    const active=!!(state[secId].fother[key] && String(state[secId].fother[key]).trim());
+    nbtn.classList.toggle('has', active);
+    marks.forEach(m=>m.classList.toggle('overridden', active));
+  };
+  const ex=state[secId].fother[key]; if(ex){ ninp.value=ex; nwrap.classList.add('open'); }
+  apply();
+  nbtn.addEventListener('click',()=>{ nwrap.classList.toggle('open'); if(nwrap.classList.contains('open')) ninp.focus(); });
+  ninp.addEventListener('input',()=>{ state[secId].fother[key]=ninp.value.trim()||undefined; apply(); render(); });
+  nwrap.appendChild(ninp); host.appendChild(nbtn); host.appendChild(nwrap);
+}
+
+function buildSections(collapsedIds){
+  const collapsedSet = new Set(collapsedIds || []);
+  root.innerHTML = '';
+  Object.keys(pillSyncers).forEach(k=>delete pillSyncers[k]);
+  rowRefreshers.length = 0;
+
+MODEL.forEach(sec => {
+  const block = el('div','block'); block.dataset.sec = sec.id;
+
+  const head = el('div','block-head');
+  const chev = el('span','chev','▾');
+  const name = el('span','name'); name.innerHTML = sec.name + ' <span class="en">'+sec.en+'</span>';
+  const xbtn = el('button','xbtn','✕'); xbtn.title='排除整段（不列入病歷）';
+  head.appendChild(chev); head.appendChild(name); head.appendChild(xbtn);
+
+  const applyExcluded=()=>{
+    const ex = state[sec.id].excluded;
+    block.classList.toggle('excluded', ex);
+    xbtn.classList.toggle('on', ex);
+    xbtn.textContent = ex ? '↩' : '✕';
+    xbtn.title = ex ? '已排除，點此恢復此段' : '排除整段（不列入病歷）';
+    if(ex) block.classList.add('collapsed');
+  };
+  xbtn.addEventListener('click',(e)=>{ e.stopPropagation(); const st=state[sec.id]; st.excluded=!st.excluded; applyExcluded(); render(); });
+  head.addEventListener('click', ()=>{ block.classList.toggle('collapsed'); });
+
+  const body = el('div','block-body');
+
+  sec.fields.forEach(f => {
+    const row = el('div','row');
+    const lbl = el('div','row-label'); lbl.textContent = f.label; row.appendChild(lbl);
+    const opts = el('div','opts');
+
+    if(f.type==='pick' || f.type==='multi'){
+      const pills=[];
+      const syncPills=()=>{
+        const v=state[sec.id].fields[f.key];
+        pills.forEach(p=>{
+          const on = f.type==='pick' ? v===p.dataset.val : (v||[]).includes(p.dataset.val);
+          p.classList.toggle('on', !!on);
+        });
+      };
+      (pillSyncers[sec.id]=pillSyncers[sec.id]||{})[f.key]=syncPills;
+      f.opts.forEach(o=>{
+        const p = el('button','pill', oL(o)); p.dataset.val=oV(o);
+        const val = oV(o);
+        p.addEventListener('click', ()=>{
+          const st=state[sec.id];
+          if(f.type==='pick'){
+            st.fields[f.key] = (st.fields[f.key]===val)? undefined : val;
+          } else {
+            let arr = st.fields[f.key] || [];
+            arr = arr.includes(val)? arr.filter(x=>x!==val) : [...arr,val];
+            st.fields[f.key] = arr.length? arr : undefined;
+          }
+          syncPills(); render();
+        });
+        pills.push(p); opts.appendChild(p);
+      });
+      syncPills();
+      addOther(opts, sec.id, f.key, pills);
+    }
+    else if(f.type==='select'){
+      const sel=el('select','sel');
+      const blank=el('option','', f.ph||'—（不選）'); blank.value=''; sel.appendChild(blank);
+      f.opts.forEach(o=>{ const op=el('option','',oL(o)); op.value=oV(o); sel.appendChild(op); });
+      const initv=state[sec.id].fields[f.key];
+      sel.value = (typeof initv==='string')? initv : '';
+      const syncSel=()=>{ sel.classList.toggle('filled', !!sel.value); };
+      syncSel();
+      sel.addEventListener('change', ()=>{ state[sec.id].fields[f.key]= sel.value||undefined; syncSel(); render(); });
+      opts.appendChild(sel);
+      addOther(opts, sec.id, f.key, [sel]);
+    }
+    else if(f.type==='text'){
+      const inp = el('input','txt w-'+(f.w||'m')); inp.type='text'; if(f.ph)inp.placeholder=f.ph;
+      const initv=state[sec.id].fields[f.key]; if(typeof initv==='string') inp.value=initv;
+      inp.addEventListener('input', ()=>{ state[sec.id].fields[f.key]= inp.value.trim()||undefined; render(); });
+      opts.appendChild(inp);
+    }
+    else if(f.type==='pair'){
+      const a=el('input','txt w-'+(f.w||'s')); a.type='text'; if(f.ph)a.placeholder=f.ph;
+      const j=el('span','inline-lbl',' - ');
+      const b=el('input','txt w-'+(f.w||'s')); b.type='text'; if(f.ph)b.placeholder=f.ph;
+      const pv=state[sec.id].fields[f.key]; if(pv && typeof pv==='object'){ a.value=pv.a||''; b.value=pv.b||''; }
+      const upd=()=>{ const av=a.value.trim(), bv=b.value.trim();
+        state[sec.id].fields[f.key]= (av||bv)? {a:av,b:bv} : undefined; render(); };
+      a.addEventListener('input',upd); b.addEventListener('input',upd);
+      opts.appendChild(a); opts.appendChild(j); opts.appendChild(b);
+      addOther(opts, sec.id, f.key, [a,b]);
+    }
+
+    row.appendChild(opts);
+    if(f.info){
+      const d=el('details','info'); const sm=el('summary','','說明'); const bd=el('div','info-body', f.info);
+      d.appendChild(sm); d.appendChild(bd); row.appendChild(d);
+    }
+    if(f.hideWhen){
+      const upd=()=>{ const hide=!!f.hideWhen(state[sec.id]); row.style.display = hide? 'none':''; };
+      rowRefreshers.push(upd); upd();
+    }
+    body.appendChild(row);
+  });
+
+  const fn = el('div','free-note');
+  fn.innerHTML = '<div class="cap">補充（自由輸入，會原樣加到此區塊末尾，每行自動加上 `）</div>';
+  const ta = el('textarea'); ta.rows=1;
+  ta.value = state[sec.id].notes || '';
+  ta.addEventListener('input', ()=>{ state[sec.id].notes = ta.value; render(); });
+  fn.appendChild(ta);
+  body.appendChild(fn);
+
+  block.appendChild(head); block.appendChild(body);
+  root.appendChild(block);
+  applyExcluded();
+  if(collapsedSet.has(sec.id)) block.classList.add('collapsed');
+});
+}
+
+/* ============================================================
+   SECT_FMT — 每一段的純文字輸出（不含 # 標題、不含每行開頭的 ` ）
+   ============================================================ */
+const SECT_FMT = {
+
+/* ---------- 開頭固定文字 ---------- */
+intro(){
+  return [
+    'A -year-old male patient with',
+    '[Active]',
+    '[Resolved]',
+    '[Underlying]',
+    ' ',
+    'We are consulted for rehabilitation;'
+  ].join('\n');
+},
+
+/* ---------- PREMORBID（完全依新模板：標點符號、•+Tab、／、；、□ 均一致） ---------- */
+pre({V,has,st}){
+  /* 無法取得資料 → 只出這一句 */
+  if(has('nodata')){
+    const o = st.fother['nodata'];
+    return '`'+((o && o.trim())? o.trim() : 'Failed to obtain premorbid information from the patient or caregiver.');
+  }
+
+  const B = '\u2022\t';                       /* • + Tab（與模板相同） */
+  const K = KEEP_BLANK;                     /* 未填時是否保留模板空白格 */
+  /* 未填：保留模板原句（blank）或整行不輸出 */
+  const F = (label, key, blank, lead)=>{
+    const v = has(key)? V(key) : null;
+    if(v===null && !K) return null;
+    return B+label+'\uff1a'+(v!==null? v : (lead||'')+blank);
+  };
+
+  const G = [];   /* [小標題, [行...]] */
+
+  /* ---- Living environment ---- */
+  const cityV = has('city')? V('city') : '';
+  const distV = has('dist')? V('dist') : '';
+  let addr = null;
+  if(cityV==='\u5317\u5317\u57fa\u6843\u4ee5\u5916') addr = '\u5317\u5317\u57fa\u6843\u4ee5\u5916';
+  else if(cityV || distV) addr = (cityV||'____\u5e02\uff0f\u7e23')+' '+(distV||'____\u5340');
+  else if(K) addr = '____\u5e02\uff0f\u7e23 ____\u5340\uff0f\u5317\u5317\u57fa\u6843\u4ee5\u5916';
+
+  const ovF = st.fother['floor'];
+  const flV = (ovF && ovF.trim())? ovF.trim() : (has('floor')? V('floor')+'\u6a13' : null);
+  const elV = has('elevator')? V('elevator') : null;
+  let home = null;
+  if(flV || elV || K) home = '\u4f4f\u5bb6\uff1a'+(flV||'____\u6a13')+'\uff1b\u96fb\u68af\uff1a'+(elV||'\u6709\uff0f\u7121');
+
+  G.push(['Living environment', [
+    addr!==null? B+'\u5c45\u4f4f\u5730\uff1a'+addr : null,
+    home!==null? B+home : null
+  ]]);
+
+  /* ---- Occupation ---- */
+  G.push(['Occupation', [
+    F('\u5e73\u65e5\u767d\u5929\u9700\u5de5\u4f5c','work','\u662f\uff0f\u5426'),
+    F('\u5de5\u4f5c\u578b\u614b','worktype','\u8fa6\u516c\u5ba4\u5de5\u4f5c\uff0f\u52de\u529b\u5de5\u4f5c')
+  ]]);
+
+  /* ---- Premorbid functional status ---- */
+  G.push(['Premorbid functional status', [
+    F('\u4f4f\u9662\u524d\u80fd\u7368\u81ea\u81f3\u81fa\u5927\u91ab\u9662\u9580\u8a3a\u5c31\u91ab','opdAlone','\u662f\uff0f\u5426'),
+    F('\u4f4f\u9662\u524d\u80fd\u9023\u7e8c\u6b65\u884c\u81f3\u5c115\u5206\u9418','walk5','\u662f\uff0f\u5426'),
+    F('\u884c\u52d5\u80fd\u529b','mobility','\u25a1 \u4e0d\u9700\u8f14\u5177\u5373\u53ef\u6b65\u884c \u25a1 \u4f7f\u7528\u8f14\u5177\u6b65\u884c \u25a1 \u4e3b\u8981\u4f7f\u7528\u8f2a\u6905 \u25a1 \u9577\u671f\u81e5\u5e8a',' '),
+    F('\u57fa\u672c\u65e5\u5e38\u751f\u6d3b\u529f\u80fd\uff08BADLs\uff09','badl','\u25a1 \u5b8c\u5168\u7368\u7acb \u25a1 \u90e8\u5206\u4f9d\u8cf4 \u25a1 \u5b8c\u5168\u4f9d\u8cf4',' ')
+  ]]);
+
+  /* ---- Exercise habits ---- */
+  G.push(['Exercise habits', [
+    F('\u4f4f\u9662\u524d\u6709\u898f\u5f8b\u904b\u52d5\u7fd2\u6163\uff08\u6bcf\u9031\u81f3\u5c112\u6b21\uff09','exercise','\u6709\uff0f\u7121')
+  ]]);
+
+  /* ---- Digital readiness ---- */
+  G.push(['Digital readiness', [
+    F('\u5e73\u6642\u6709\u4f7f\u7528LINE','line','\u662f\uff0f\u5426'),
+    F('\u80fd\u81ea\u884c\u6383\u63cfQR Code','qr','\u662f\uff0f\u5426'),
+    F('\u80fd\u81ea\u884c\u4f7f\u7528\u7db2\u8def\u639b\u865f','reg','\u662f\uff0f\u5426')
+  ]]);
+
+  const L=[];
+  G.forEach(g=>{
+    const items = g[1].filter(x=>x);
+    if(!items.length) return;          /* 整組都沒填就連小標題一起不出 */
+    L.push('`'+g[0]);
+    items.forEach(x=>L.push(x));
+  });
+  return L.join('\n');
+},
+
+/* ---------- BRIEF SUMMARY（固定文字） ---------- */
+brief(){
+  return [
+    'EKG:',
+    'Cardiac echo: LVEF %',
+    'CAG:',
+    'Lab data',
+    'Cardiac enzymes: peaked level of Troponin T and CK level passed',
+    'Current condition: No newly onset or recurrent chest pain in past 8 hours.'
+  ].join('\n');
+},
+
+/* ---------- 病人意願 ---------- */
+will({V,has}){
+  const L=[];
+  const q1 = has('rehab')? V('rehab') : null;
+  if(q1!==null) L.push('1.\u5fc3\u80ba\u5fa9\u5065:'+q1);
+  /* 第一題選「考慮」→ 第二題不用填、也不輸出 */
+  if(q1!=='\u8003\u616e' && has('consult')) L.push('2.\u8aee\u8a62:'+V('consult'));
+  return L.join('\n');
+},
+
+/* ---------- PHYSICAL EXAMINATION ---------- */
+pe({V,has,VN,VJ}){
+  const L=[];
+  if(has('vital')) L.push('Vital signs: '+VN('vital')+' ');
+  if(has('o2'))    L.push('Oxygen demand: '+VN('o2')+' ');
+  if(has('cons'))  L.push('Consciousness: '+VN('cons'));
+  if(has('bp'))    L.push('Breathing pattern: '+VN('bp')+' ');
+  if(has('bs'))    L.push('Breath sound: '+VN('bs')+' ');
+  if(has('lung'))  L.push('Lung expansion: '+VN('lung')+' ');
+  if(has('cough')) L.push('Cough ability: '+VN('cough'));
+  if(has('wound')) L.push('Wound: '+VN('wound'));
+  if(has('tube'))  L.push('Tube: '+VJ('tube','/'));
+  if(has('mpCoop')||has('mpWeak')){
+    const mpP=[]; if(has('mpCoop')) mpP.push(VN('mpCoop')); if(has('mpWeak')) mpP.push(VN('mpWeak'));
+    L.push('Muscle power: '+mpP.join(', '));
+  }
+  if(has('sens'))  L.push('Sensation: '+VN('sens'));
+  if(has('func'))  L.push('Functional status: '+VN('func')+' ');
+  if(has('walk1')) L.push('\u80fd\u7368\u81ea\u6b65\u884c > 1 \u5206\u9418: '+VN('walk1'));
+  if(has('badl2')) L.push('BADLs: '+VN('badl2')+' ');
+  return L.join('\n');
+}
+
+};
+
+/* ---------- generate plain text ---------- */
+function generate(){
+  const blocks=[];
+  MODEL.forEach(sec=>{
+    const st=state[sec.id];
+    if(st.excluded) return;
+    st.fother = st.fother || {};
+    const ov = k => { const o=st.fother[k]; return (o!==undefined && o!==null && String(o).trim()!=='')? String(o).trim() : undefined; };
+    const RAW = k => st.fields[k];
+    const V  = k => { const o=ov(k); return o!==undefined? o : st.fields[k]; };
+    const has= k => { if(ov(k)!==undefined) return true; const v=st.fields[k];
+                      return v!==undefined && v!==null && v!=='' && !(Array.isArray(v)&&v.length===0); };
+    const VJ = (k,sep) => { const o=ov(k); if(o!==undefined) return o; const v=st.fields[k];
+                      if(v===undefined||v===null) return ''; return Array.isArray(v)? v.join(sep||', ') : v; };
+    const VN = k => { const o=ov(k); if(o!==undefined) return o; if(!has(k)) return '';
+                      let v=st.fields[k]; if(Array.isArray(v)) v=v.join(', ');
+                      else if(v && typeof v==='object') v=(v.a||'')+'/'+(v.b||'');
+                      const n=st.fnotes[k]; return v+(n?' '+n:''); };
+
+    let body = (typeof SECT_FMT[sec.id]==='function')? SECT_FMT[sec.id]({V,has,VN,VJ,RAW,st}) : '';
+
+    const bn=(st.notes||'').trim();
+    if(bn){ const extra=bn.split(/\n/).map(x=>x.trim()).filter(Boolean)
+                          .map(x=> (sec.raw && !sec.bare)? '`'+x : x).join('\n');
+            body = body? body+'\n'+extra : extra; }
+    if(!body || !body.trim()) return;
+
+    /* raw 區塊（第一段）自己控制 ` 的位置；其餘段落每行自動加 ` */
+    const lines = (sec.raw||sec.bare)? body : body.split('\n').map(l=>'`'+l).join('\n');
+    blocks.push(sec.bare? lines : '#'+(sec.outName||sec.name)+'\n'+lines);
+  });
+  return blocks.length? blocks.join('\n\n')+'\n' : '';
+}
+
+function render(){
+  rowRefreshers.forEach(fn=>{ try{ fn(); }catch(e){} });
+  const txt=generate();
+  OUT.textContent=txt;
+  EMPTY.style.display = txt? 'none':'block';
+  try{ syncRecUI(); saveDraftSoon(); }catch(e){}
+}
+
+/* ---------- toolbar ---------- */
+document.getElementById('collapseAll').onclick=()=>document.querySelectorAll('.block').forEach(b=>b.classList.add('collapsed'));
+document.getElementById('expandAll').onclick=()=>document.querySelectorAll('.block').forEach(b=>b.classList.remove('collapsed'));
+const blankBtn=document.getElementById('blankMode');
+blankBtn.onclick=()=>{ KEEP_BLANK=!KEEP_BLANK;
+  blankBtn.textContent='未填欄位：'+(KEEP_BLANK?'保留空白格':'不輸出'); render(); };
+document.getElementById('resetAll').onclick=()=>{
+  if(!guardOverwrite('目前內容尚未存成紀錄，清空後就沒了，確定要清空嗎？')) return;
+  if(!confirm('清空目前表單並回到預設值？（已儲存的紀錄不會被刪除）')) return;
+  currentId = null;
+  restoreSnapshot(DEFAULT_SNAP);
+  meta.date = todayStr(); elDate.value = meta.date;
+  render(); renderRecList(); toast('已清空，可以開始新的一筆');
+};
+
+/* ---------- copy ---------- */
+const copyBtn=document.getElementById('copyBtn');
+copyBtn.onclick=async()=>{
+  const txt=generate();
+  if(!txt){ copyBtn.textContent='沒有內容'; setTimeout(()=>copyBtn.textContent='複製',1200); return; }
+  try{ await navigator.clipboard.writeText(txt); }
+  catch(e){ const r=document.createRange(); r.selectNodeContents(OUT); const s=getSelection(); s.removeAllRanges(); s.addRange(r); document.execCommand('copy'); s.removeAllRanges(); }
+  copyBtn.textContent='已複製 ✓'; copyBtn.classList.add('done');
+  setTimeout(()=>{copyBtn.textContent='複製'; copyBtn.classList.remove('done');},1400);
+};
+
+/* =========================================================================
+   RECORDS — 每次照會存成一筆紀錄（只存在本機瀏覽器 localStorage）
+   ========================================================================= */
+const LS_REC   = 'cvconsult_records_v1';
+const LS_DRAFT = 'cvconsult_draft_v1';
+
+const meta = { title:'', date:'', memo:'' };
+let currentId   = null;    /* 目前正在編輯的紀錄 id；null = 還沒存檔的新的一筆 */
+let RECS        = [];
+let DEFAULT_SNAP= null;
+let draftTimer  = null;
+
+const $ = id => document.getElementById(id);
+const elTitle=$('metaTitle'), elDate=$('metaDate'), elMemo=$('metaMemo'), elStatus=$('draftStatus');
+const elSave=$('saveRec'), elUpdate=$('updateRec'), elCount=$('recCount'), elQuick=$('saveQuick');
+const dw=$('recDrawer'), dwMask=$('recMask'), dwList=$('recList'), dwCount=$('dwCount'), dwSearch=$('recSearch');
+const toastEl=$('toast');
+
+/* ---------- 小工具 ---------- */
+function toast(msg){
+  toastEl.textContent=msg; toastEl.classList.add('show');
+  clearTimeout(toastEl._t); toastEl._t=setTimeout(()=>toastEl.classList.remove('show'),1900);
+}
+function pad(n){ return String(n).padStart(2,'0'); }
+function todayStr(d){ d=d||new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function fmtTime(iso){ try{ const d=new Date(iso);
+  return d.getFullYear()+'/'+pad(d.getMonth()+1)+'/'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes());
+}catch(e){ return ''; } }
+function uid(){ return 'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function deep(o){ return JSON.parse(JSON.stringify(o)); }
+function safeName(s){ return String(s||'record').replace(/[\\/:*?"<>|\s]+/g,'_').slice(0,60); }
+
+function lsGet(k,fb){ try{ const s=localStorage.getItem(k); return s? JSON.parse(s): fb; }catch(e){ return fb; } }
+function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }
+  catch(e){ toast('儲存失敗：瀏覽器空間不足，或此瀏覽器封鎖了本機儲存'); return false; } }
+function persist(){ return lsSet(LS_REC, RECS); }
+
+/* ---------- 快照：把整份表單狀態存成可還原的資料 ---------- */
+function snapshot(){
+  return {
+    v:1,
+    keepBlank: KEEP_BLANK,
+    meta: { title:meta.title, date:meta.date, memo:meta.memo },
+    state: deep(state),
+    collapsed: Array.prototype.slice.call(document.querySelectorAll('.block.collapsed')).map(b=>b.dataset.sec)
+  };
+}
+/* 比對用：忽略「收合／展開」這種不影響內容的差異 */
+function coreOf(snap){
+  snap = snap || {};
+  return JSON.stringify({ k: snap.keepBlank!==false, m: snap.meta||{}, s: snap.state||{} });
+}
+function restoreSnapshot(snap){
+  if(!snap) return;
+  KEEP_BLANK = snap.keepBlank!==false;
+  blankBtn.textContent = '未填欄位：'+(KEEP_BLANK?'保留空白格':'不輸出');
+  const S = deep(snap.state||{});
+  MODEL.forEach(sec=>{
+    const s = S[sec.id] || {};
+    state[sec.id] = { notes:s.notes||'', fields:s.fields||{}, fnotes:s.fnotes||{}, fother:s.fother||{}, excluded:!!s.excluded };
+  });
+  const m = snap.meta || {};
+  meta.title=m.title||''; meta.date=m.date||''; meta.memo=m.memo||'';
+  elTitle.value=meta.title; elDate.value=meta.date; elMemo.value=meta.memo;
+  buildSections(snap.collapsed);
+  render();
+}
+
+/* ---------- 未存檔判斷 ---------- */
+function currentRec(){ return currentId? RECS.find(r=>r.id===currentId) : null; }
+function isDirtyNow(){
+  const cur=currentRec();
+  if(cur) return coreOf(snapshot())!==coreOf(cur.snap);
+  return !!generate().trim();          /* 新的一筆：只要有內容就算未存檔 */
+}
+function guardOverwrite(msg){ return !isDirtyNow() || confirm(msg); }
+
+/* ---------- 上方狀態列 ---------- */
+function syncRecUI(){
+  if(currentId && !currentRec()) currentId=null;
+  const cur=currentRec();
+  elCount.textContent='('+RECS.length+')';
+  elUpdate.hidden = !cur;
+  if(cur){
+    const dirty = coreOf(snapshot())!==coreOf(cur.snap);
+    elSave.textContent   = '＋ 另存成新紀錄';
+    elUpdate.textContent = dirty? '● 更新此紀錄' : '更新此紀錄';
+    elQuick.textContent  = dirty? '更新紀錄' : '已儲存 ✓';
+    elStatus.textContent = '目前編輯：'+cur.title+(dirty? '（有未儲存的變更）':'（已儲存）');
+    elStatus.classList.toggle('dirty', dirty);
+  } else {
+    elSave.textContent   = '＋ 存成新紀錄';
+    elQuick.textContent  = '存成紀錄';
+    elStatus.textContent = '尚未存成紀錄（草稿自動保存中）';
+    elStatus.classList.remove('dirty');
+  }
+}
+
+/* ---------- 草稿自動保存 ---------- */
+function saveDraftNow(){
+  lsSet(LS_DRAFT, { snap:snapshot(), currentId:currentId, savedAt:new Date().toISOString() });
+}
+function saveDraftSoon(){ clearTimeout(draftTimer); draftTimer=setTimeout(saveDraftNow, 400); }
+window.addEventListener('beforeunload', saveDraftNow);
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) saveDraftNow(); });
+
+/* ---------- 存檔 / 更新 / 載入 / 刪除 ---------- */
+function fillMetaDefaults(){
+  if(!meta.date){ meta.date=todayStr(); elDate.value=meta.date; }
+  if(!meta.title.trim()){ meta.title='未命名 '+fmtTime(new Date().toISOString()); elTitle.value=meta.title; }
+}
+function saveAsNew(){
+  const txt=generate();
+  if(!txt.trim() && !confirm('目前病歷內容是空白的，還是要建立一筆紀錄嗎？')) return;
+  fillMetaDefaults();
+  const now=new Date().toISOString();
+  const rec={ id:uid(), title:meta.title.trim(), date:meta.date, memo:meta.memo.trim(),
+              createdAt:now, updatedAt:now, snap:snapshot(), text:txt };
+  RECS.unshift(rec);
+  if(!persist()){ RECS.shift(); return; }
+  currentId=rec.id;
+  render(); renderRecList(); syncSoon(); toast('已存成新紀錄：'+rec.title);
+}
+function updateCurrent(){
+  const i=RECS.findIndex(r=>r.id===currentId);
+  if(i<0){ saveAsNew(); return; }
+  fillMetaDefaults();
+  const r=RECS[i];
+  r.title=meta.title.trim()||r.title; r.date=meta.date; r.memo=meta.memo.trim();
+  r.text=generate(); r.snap=snapshot(); r.updatedAt=new Date().toISOString();
+  RECS.splice(i,1); RECS.unshift(r);          /* 最近更新的排最前面 */
+  persist(); render(); renderRecList(); syncSoon(); toast('已更新：'+r.title);
+}
+function saveOrUpdate(){ currentRec()? updateCurrent() : saveAsNew(); }
+
+function loadRecord(id){
+  const r=RECS.find(x=>x.id===id); if(!r) return;
+  if(id!==currentId && !guardOverwrite('目前內容尚未存成紀錄，載入其他紀錄會覆蓋掉，確定要繼續嗎？')) return;
+  restoreSnapshot(r.snap);
+  currentId=id; render(); renderRecList(); closeDrawer(); toast('已載入：'+r.title);
+}
+function cloneRecord(id){
+  const r=RECS.find(x=>x.id===id); if(!r) return;
+  if(!guardOverwrite('目前內容尚未存成紀錄，會被覆蓋，確定要繼續嗎？')) return;
+  restoreSnapshot(r.snap);
+  currentId=null;
+  meta.title=(r.title||'')+'（新）'; elTitle.value=meta.title;
+  meta.date=todayStr(); elDate.value=meta.date;
+  render(); renderRecList(); closeDrawer(); toast('已帶入內容，存檔後會是新的一筆');
+}
+function delRecord(id){
+  const r=RECS.find(x=>x.id===id); if(!r) return;
+  if(!confirm('刪除紀錄「'+r.title+'」？刪除後無法復原'+(isConnected()? '，其他裝置下次同步時也會一起刪除':'')+'。')) return;
+  RECS=RECS.filter(x=>x.id!==id); persist();
+  addTomb(id);                       /* 留一個刪除記號，免得同步時又被其他裝置推回來 */
+  if(currentId===id) currentId=null;
+  render(); renderRecList(); syncSoon(); toast('已刪除');
+}
+async function copyText(txt){
+  if(!txt){ toast('這筆沒有內容'); return; }
+  try{ await navigator.clipboard.writeText(txt); toast('已複製全文 ✓'); }
+  catch(e){
+    const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); toast('已複製全文 ✓'); }catch(e2){ toast('複製失敗，請手動選取'); }
+    ta.remove();
+  }
+}
+function download(name, content, mime){
+  const b=new Blob([content], {type: mime||'text/plain;charset=utf-8'});
+  const u=URL.createObjectURL(b); const a=document.createElement('a');
+  a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u), 1500);
+}
+
+/* ---------- 紀錄清單 ---------- */
+/* 卡片預覽：略過每份都一樣的固定開頭，直接顯示比較有辨識度的內容 */
+function previewOf(txt){
+  if(!txt || !txt.trim()) return '（空白）';
+  let t=txt;
+  const lines=t.split('\n');
+  const k=lines.findIndex(l=>l.indexOf('We are consulted for rehabilitation')>=0);
+  if(k>=0 && k<8) t=lines.slice(k+1).join('\n').replace(/^\s+/,'');
+  return t.slice(0,400) || txt.slice(0,400);
+}
+function renderRecList(){
+  const q=(dwSearch.value||'').trim().toLowerCase();
+  const list = q? RECS.filter(r=>((r.title||'')+' '+(r.memo||'')+' '+(r.date||'')+' '+(r.text||'')).toLowerCase().indexOf(q)>=0)
+                : RECS.slice();
+  elCount.textContent='('+RECS.length+')';
+  dwCount.textContent= RECS.length? ('共 '+RECS.length+' 筆'+(q? ('／符合 '+list.length+' 筆'):'')) : '';
+  dwList.innerHTML='';
+  if(!list.length){
+    const e=el('div','dw-empty', RECS.length? '沒有符合搜尋的紀錄。' : '還沒有任何紀錄。填好左側內容後，按上方「＋ 存成新紀錄」就會留下一筆。');
+    dwList.appendChild(e); return;
+  }
+  list.forEach(r=>{
+    const card=el('div','rec'+(r.id===currentId? ' cur':''));
+    const top=el('div','rec-top');
+    const t=el('span','rec-title'); t.textContent=r.title||'（未命名）';
+    if(r.id===currentId){ const tg=el('span','tag','編輯中'); t.appendChild(tg); }
+    const d=el('span','rec-date', (r.date||'')+'　'+fmtTime(r.updatedAt||r.createdAt));
+    top.appendChild(t); top.appendChild(d); card.appendChild(top);
+    if(r.memo) card.appendChild(el('div','rec-memo', r.memo));
+    card.appendChild(el('pre','rec-prev', previewOf(r.text)));
+    const acts=el('div','rec-acts');
+    const mk=(label,fn,cls)=>{ const b=el('button',cls||'',label); b.addEventListener('click',fn); acts.appendChild(b); };
+    mk('載入編輯', ()=>loadRecord(r.id));
+    mk('複製全文', ()=>copyText(r.text||''));
+    mk('以此新增', ()=>cloneRecord(r.id));
+    mk('下載 .txt', ()=>download(safeName((r.date||'')+'_'+r.title)+'.txt', r.text||''));
+    mk('刪除', ()=>delRecord(r.id), 'danger');
+    card.appendChild(acts);
+    dwList.appendChild(card);
+  });
+}
+function openDrawer(){ renderRecList(); dw.classList.add('open'); dwMask.classList.add('open'); dw.setAttribute('aria-hidden','false'); }
+function closeDrawer(){ dw.classList.remove('open'); dwMask.classList.remove('open'); dw.setAttribute('aria-hidden','true'); }
+
+/* ---------- 匯出 / 匯入 ---------- */
+function exportJson(){
+  if(!RECS.length){ toast('目前沒有紀錄可匯出'); return; }
+  download('cv_consult_records_'+todayStr()+'.json',
+           JSON.stringify({app:'cv-consult', v:1, exportedAt:new Date().toISOString(), records:RECS}, null, 2),
+           'application/json;charset=utf-8');
+  toast('已匯出 '+RECS.length+' 筆');
+}
+function exportCsv(){
+  if(!RECS.length){ toast('目前沒有紀錄可匯出'); return; }
+  const head=['id','title','date','memo','createdAt','updatedAt','text'];
+  const esc=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+  const rows=[head.join(',')].concat(RECS.map(r=>head.map(h=>esc(r[h])).join(',')));
+  download('cv_consult_records_'+todayStr()+'.csv', '\ufeff'+rows.join('\r\n'), 'text/csv;charset=utf-8');
+  toast('已匯出 CSV');
+}
+function importJson(file){
+  const fr=new FileReader();
+  fr.onload=()=>{
+    let data;
+    try{ data=JSON.parse(String(fr.result)); }catch(e){ toast('檔案格式不正確，無法讀取'); return; }
+    const arr = Array.isArray(data)? data : (data && Array.isArray(data.records)? data.records : null);
+    if(!arr){ toast('這個檔案裡找不到紀錄'); return; }
+    let added=0, skipped=0;
+    arr.forEach(r=>{
+      if(!r || typeof r!=='object' || !r.snap) return;
+      const dup = r.id? RECS.find(x=>x.id===r.id) : null;
+      /* 同 id 且更新時間相同 → 就是同一筆，略過（重複匯入同一個備份不會變兩筆） */
+      if(dup && String(dup.updatedAt||'')===String(r.updatedAt||'')){ skipped++; return; }
+      const rec={ id: dup? uid() : (r.id||uid()),
+                  title:String(r.title||'（匯入）'), date:String(r.date||''), memo:String(r.memo||''),
+                  createdAt:r.createdAt||new Date().toISOString(), updatedAt:r.updatedAt||r.createdAt||new Date().toISOString(),
+                  snap:r.snap, text:String(r.text||'') };
+      RECS.push(rec); added++;
+    });
+    RECS.sort((a,b)=> String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+    persist(); render(); renderRecList(); syncSoon();
+    toast(added? ('已匯入 '+added+' 筆'+(skipped? '（略過重複 '+skipped+' 筆）':''))
+               : (skipped? ('都已經在清單裡了，略過 '+skipped+' 筆') : '沒有可匯入的紀錄'));
+  };
+  fr.readAsText(file);
+}
+function clearAllRecords(){
+  if(!RECS.length){ toast('目前沒有紀錄'); return; }
+  const cloud = isConnected()? '（連同雲端硬碟上的，以及其他裝置下次同步後的紀錄）' : '';
+  if(!confirm('刪除全部 '+RECS.length+' 筆紀錄'+cloud+'？無法復原，建議先「匯出 JSON」備份。')) return;
+  if(!confirm('再確認一次：真的要全部刪除嗎？\n（只是想清掉這台電腦的資料、保留雲端，請改按「離開這台電腦」）')) return;
+  RECS.forEach(r=>addTomb(r.id));
+  RECS=[]; persist(); currentId=null;
+  try{ localStorage.removeItem(LS_DRAFT); }catch(e){}
+  render(); renderRecList(); syncSoon(); toast('已刪除全部紀錄');
+}
+/* 公用電腦用完：登出 + 清掉這台機器的本機資料，雲端的紀錄保留 */
+function wipeDevice(){
+  if(!confirm('要清掉這台電腦上的所有本機資料並登出雲端嗎？\n雲端硬碟上的紀錄會保留，之後重新登入就能拉回來。')) return;
+  gRevoke();
+  [LS_REC, LS_DRAFT, LS_DEL, LS_TOKEN, LS_FILEID, LS_EMAIL, LS_CONNECTED, LS_LASTSYNC].forEach(k=>{
+    try{ localStorage.removeItem(k); }catch(e){}
+  });
+  RECS=[]; currentId=null;
+  restoreSnapshot(DEFAULT_SNAP);
+  meta.date=todayStr(); elDate.value=meta.date;
+  render(); renderRecList(); setSyncUI(); toast('已登出並清空這台電腦的資料');
+}
+
+/* =========================================================================
+   SYNC — 跨裝置同步（Google 雲端硬碟）
+   • 資料存成你自己雲端硬碟裡的一個 JSON 檔，不經過任何第三方伺服器
+   • 權限只要 drive.file：本程式只碰得到它自己建立的那一個檔案
+   • 本機優先：沒網路／沒登入時，整個工具照常運作，之後再補同步
+   ========================================================================= */
+const GOOGLE_CLIENT_ID = '';   /* ← 想寫死的話把用戶端 ID 貼在這裡（留空則用同步面板裡的設定） */
+
+const GD_SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
+const GD_NAME  = 'cv_consult_records.json';
+const LS_GID='cvconsult_gclient_id', LS_TOKEN='cvconsult_gtoken', LS_FILEID='cvconsult_gfileid',
+      LS_EMAIL='cvconsult_gemail', LS_CONNECTED='cvconsult_gconnected',
+      LS_DEL='cvconsult_deleted_v1', LS_AUTO='cvconsult_autosync', LS_LASTSYNC='cvconsult_lastsync';
+
+let gToken=null, gExp=0, gFileId=null, gEmail='', tokenClient=null, pendingAuth=null;
+let syncing=false, syncTimer=null, lastSyncTry=0;
+/* 權杖過期後，瀏覽器會擋掉「沒有經過點擊」的授權視窗；失敗一次就別再自動重試，
+   改成把狀態顯示成「需重新登入」，等使用者自己點一下（那時才有手勢，視窗才開得起來） */
+let silentAuthBlocked=false;
+
+const elChip=$('syncChip'), elChipText=$('syncText'), elSyncStatus=$('syncStatusText'),
+      elGid=$('gidInput'), elAuto=$('gAuto'), elGidRow=$('gidRow');
+
+function gClientId(){ return (GOOGLE_CLIENT_ID||'').trim() || String(lsGet(LS_GID,'')||'').trim(); }
+function autoOn(){ const v=lsGet(LS_AUTO,null); return v===null? true : !!v; }
+function isConnected(){ return !!(gClientId() && lsGet(LS_CONNECTED,false)); }
+
+/* ---------- 刪除記號（墓碑）：讓「刪除」也能同步出去 ---------- */
+function loadTombs(){ const a=lsGet(LS_DEL,[]); return Array.isArray(a)? a: []; }
+function saveTombs(a){ lsSet(LS_DEL, a); }
+function addTomb(id){
+  const a=loadTombs().filter(t=>t.id!==id);
+  a.push({id:id, at:new Date().toISOString()});
+  saveTombs(a);
+}
+function mergeTombs(a,b){
+  const m=new Map();
+  (a||[]).concat(b||[]).forEach(t=>{
+    if(!t || !t.id) return;
+    const ex=m.get(t.id);
+    if(!ex || String(t.at||'')>String(ex.at||'')) m.set(t.id, {id:t.id, at:String(t.at||'')});
+  });
+  return [...m.values()];
+}
+function pruneTombs(a){                       /* 半年前的刪除記號就不用再留著了 */
+  const cut=new Date(Date.now()-180*86400000).toISOString();
+  return (a||[]).filter(t=>String(t.at||'')>cut);
+}
+
+/* ---------- 合併：同一筆取 updatedAt 較新的；刪除記號比該筆更新就真的刪掉 ---------- */
+function mergeRecords(local, remote, tombs){
+  const m=new Map();
+  const put=r=>{
+    if(!r || !r.id) return;
+    const ex=m.get(r.id);
+    if(!ex || String(r.updatedAt||'')>String(ex.updatedAt||'')) m.set(r.id, r);
+  };
+  (remote||[]).forEach(put); (local||[]).forEach(put);
+  (tombs||[]).forEach(t=>{
+    const r=m.get(t.id);
+    if(r && String(t.at||'')>=String(r.updatedAt||'')) m.delete(t.id);
+  });
+  return [...m.values()].sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+}
+
+/* ---------- 授權 ---------- */
+function gisReady(){
+  return new Promise((res,rej)=>{
+    if(window.google && google.accounts && google.accounts.oauth2) return res();
+    let n=0;
+    const t=setInterval(()=>{
+      if(window.google && google.accounts && google.accounts.oauth2){ clearInterval(t); res(); }
+      else if(++n>60){ clearInterval(t); rej(new Error('載入 Google 登入元件失敗（網路或防火牆擋住 accounts.google.com）')); }
+    },150);
+  });
+}
+async function initTokenClient(){
+  const cid=gClientId();
+  if(!cid) throw authErr('尚未設定 OAuth 用戶端 ID');
+  if(tokenClient && tokenClient._cid===cid) return tokenClient;
+  await gisReady();
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: cid,
+    scope: GD_SCOPE,
+    callback: (resp)=>{
+      const p=pendingAuth; pendingAuth=null;
+      if(resp && resp.access_token){
+        gToken=resp.access_token;
+        gExp=Date.now()+(((resp.expires_in||3600)-90)*1000);
+        silentAuthBlocked=false;
+        lsSet(LS_TOKEN,{token:gToken, exp:gExp}); lsSet(LS_CONNECTED,true);
+        fetchEmail();
+        if(p) p.resolve(gToken);
+      } else if(p) p.reject(authErr('沒有取得授權'));
+    },
+    error_callback: (err)=>{
+      const p=pendingAuth; pendingAuth=null;
+      if(p && !p.interactive) silentAuthBlocked=true;
+      if(p) p.reject(authErr('授權已過期，請點一下「立即同步」重新登入'));
+    }
+  });
+  tokenClient._cid=cid;
+  return tokenClient;
+}
+function authErr(msg){ const e=new Error(msg); e.needAuth=true; return e; }
+
+async function ensureToken(interactive){
+  const now=Date.now();
+  if(gToken && gExp>now) return gToken;
+  const st=lsGet(LS_TOKEN,null);
+  if(st && st.token && st.exp>now){ gToken=st.token; gExp=st.exp; return gToken; }
+  if(!interactive && !lsGet(LS_CONNECTED,false)) throw authErr('尚未連結雲端硬碟');
+  if(!interactive && silentAuthBlocked) throw authErr('授權已過期，請點一下「立即同步」重新登入');
+  const tc=await initTokenClient();
+  return new Promise((resolve,reject)=>{
+    pendingAuth={resolve,reject,interactive:!!interactive};
+    try{ tc.requestAccessToken({prompt:''}); }
+    catch(e){
+      pendingAuth=null;
+      if(!interactive) silentAuthBlocked=true;
+      reject(authErr('無法開啟 Google 授權視窗（可能被瀏覽器擋住彈出視窗）'));
+    }
+  });
+}
+function gRevoke(){
+  try{ if(gToken && window.google && google.accounts && google.accounts.oauth2) google.accounts.oauth2.revoke(gToken, ()=>{}); }catch(e){}
+  gToken=null; gExp=0; gFileId=null; gEmail='';
+}
+function disconnect(){
+  if(!confirm('中斷與雲端硬碟的連結？\n這台電腦的紀錄會留著，雲端硬碟上的檔案也不會刪除。')) return;
+  gRevoke();
+  [LS_TOKEN, LS_CONNECTED, LS_EMAIL, LS_FILEID].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+  setSyncUI(); toast('已中斷連結');
+}
+
+/* ---------- Drive API ---------- */
+async function driveFetch(url, opts, retried){
+  const t=await ensureToken(false);
+  opts=Object.assign({}, opts||{});
+  opts.headers=Object.assign({}, opts.headers||{}, {Authorization:'Bearer '+t});
+  const r=await fetch(url, opts);
+  if((r.status===401||r.status===403) && !retried){
+    gToken=null; gExp=0; try{ localStorage.removeItem(LS_TOKEN); }catch(e){}
+    return driveFetch(url, opts, true);
+  }
+  if(!r.ok){
+    const body=await r.text().catch(()=>'');
+    const e=new Error('Drive '+r.status+'：'+String(body).slice(0,140));
+    if(r.status===401||r.status===403) e.needAuth=true;
+    e.status=r.status; throw e;
+  }
+  return r;
+}
+async function gdFind(){
+  const q=encodeURIComponent("name='"+GD_NAME+"' and trashed=false");
+  const r=await driveFetch('https://www.googleapis.com/drive/v3/files?q='+q+'&spaces=drive&pageSize=5&fields=files(id,modifiedTime)');
+  const j=await r.json();
+  const f=(j.files||[])[0];
+  return f? f.id : null;
+}
+async function gdRead(id){
+  try{
+    const r=await driveFetch('https://www.googleapis.com/drive/v3/files/'+id+'?alt=media');
+    const t=await r.text();
+    return t? JSON.parse(t) : null;
+  }catch(e){
+    if(e.status===404){ gFileId=null; try{ localStorage.removeItem(LS_FILEID); }catch(x){} return null; }
+    throw e;
+  }
+}
+async function gdCreate(body){
+  const b='cvconsult'+Date.now();
+  const metaPart=JSON.stringify({name:GD_NAME, mimeType:'application/json',
+                                 description:'心肺照會病歷產生器：跨裝置同步檔（請勿手動改動）'});
+  const payload='--'+b+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+metaPart+
+                '\r\n--'+b+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+body+
+                '\r\n--'+b+'--';
+  const r=await driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+    {method:'POST', headers:{'Content-Type':'multipart/related; boundary='+b}, body:payload});
+  const j=await r.json();
+  return j.id;
+}
+async function gdWrite(id, body){
+  await driveFetch('https://www.googleapis.com/upload/drive/v3/files/'+id+'?uploadType=media',
+    {method:'PATCH', headers:{'Content-Type':'application/json; charset=UTF-8'}, body:body});
+}
+async function fetchEmail(){
+  try{
+    const r=await driveFetch('https://www.googleapis.com/oauth2/v3/userinfo');
+    const j=await r.json();
+    gEmail=j.email||''; lsSet(LS_EMAIL, gEmail); setSyncUI();
+  }catch(e){}
+}
+
+/* ---------- 同步主流程 ---------- */
+async function syncNow(opts){
+  opts=opts||{};
+  if(syncing) return;
+  if(!gClientId()){
+    setSyncUI('nocfg');
+    if(!opts.silent){ openDrawer(); $('syncBox').open=true; toast('請先在「雲端同步」裡設定用戶端 ID'); }
+    return;
+  }
+  if(!navigator.onLine){ setSyncUI('offline'); if(!opts.silent) toast('目前沒有網路，等一下會自動再試'); return; }
+  syncing=true; lastSyncTry=Date.now(); setSyncUI('busy');
+  try{
+    await ensureToken(!!opts.interactive);
+    let id = gFileId || lsGet(LS_FILEID,null) || await gdFind();
+    let remote = id? await gdRead(id) : null;
+    if(id && !remote) id=null;                       /* 檔案被刪掉了 → 重建 */
+    const rRecs = (remote && Array.isArray(remote.records))? remote.records : [];
+    const rDels = (remote && Array.isArray(remote.deleted))? remote.deleted : [];
+    const tombs = pruneTombs(mergeTombs(loadTombs(), rDels));
+    const merged= mergeRecords(RECS, rRecs, tombs);
+    const body  = JSON.stringify({app:'cv-consult', v:1, updatedAt:new Date().toISOString(),
+                                  records:merged, deleted:tombs});
+    if(id) await gdWrite(id, body); else id=await gdCreate(body);
+    gFileId=id; lsSet(LS_FILEID,id); saveTombs(tombs);
+    const before=RECS.length;
+    RECS=merged; persist(); lsSet(LS_LASTSYNC, new Date().toISOString());
+    setSyncUI('ok'); render(); renderRecList();
+    if(!opts.silent) toast('已同步：共 '+merged.length+' 筆'+(merged.length!==before? '（本機 '+before+' → '+merged.length+'）':''));
+  }catch(e){
+    setSyncUI(e && e.needAuth? 'needauth':'error', e && e.message);
+    if(!opts.silent) toast(e && e.needAuth? '請按「連結雲端硬碟」重新登入' : ('同步失敗：'+((e&&e.message)||'未知錯誤')));
+  }finally{
+    syncing=false;
+  }
+}
+function syncSoon(){
+  if(!isConnected() || !autoOn()) return;
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(()=>syncNow({silent:true}), 2500);
+}
+async function connectDrive(){
+  const cid=gClientId();
+  if(!cid){ $('syncBox').open=true; elGid.focus(); toast('請先貼上 OAuth 用戶端 ID'); return; }
+  try{
+    setSyncUI('busy');
+    await initTokenClient();
+    await ensureToken(true);
+    await fetchEmail();
+    await syncNow({interactive:true});
+  }catch(e){
+    setSyncUI('error', e && e.message);
+    toast('連結失敗：'+((e&&e.message)||'未知錯誤'));
+  }
+}
+
+/* ---------- 同步狀態顯示 ---------- */
+function setSyncUI(kind, msg){
+  const cid=gClientId();
+  gEmail = gEmail || String(lsGet(LS_EMAIL,'')||'');
+  const last=lsGet(LS_LASTSYNC,null);
+  const lastTxt = last? ('上次同步 '+fmtTime(last)) : '尚未同步過';
+  if(kind===undefined) kind = !cid? 'nocfg' : (isConnected()? (last?'ok':'idle') : 'idle');
+  let chip='未連結雲端', cls='', st='未連結';
+  if(kind==='nocfg'){ chip='雲端未設定'; cls=''; st='還沒設定 OAuth 用戶端 ID'; }
+  else if(kind==='busy'){ chip='同步中…'; cls='busy'; st='同步中…'; }
+  else if(kind==='ok'){ chip='已同步'; cls='ok'; st='已連結'+(gEmail? '（'+gEmail+'）':'')+'　'+lastTxt; }
+  else if(kind==='needauth'){ chip='需重新登入'; cls='warn'; st='需要重新登入：'+(msg||'授權已過期'); }
+  else if(kind==='offline'){ chip='離線'; cls='warn'; st='目前沒有網路，恢復連線後會自動同步　'+lastTxt; }
+  else if(kind==='error'){ chip='同步失敗'; cls='err'; st='同步失敗：'+(msg||'未知錯誤')+'　'+lastTxt; }
+  else { /* idle */
+    if(isConnected()){ chip='已連結'; cls='ok'; st='已連結'+(gEmail? '（'+gEmail+'）':'')+'　'+lastTxt; }
+    else { chip='未連結雲端'; cls=''; st='尚未連結（目前只存在這台電腦）'; }
+  }
+  elChipText.textContent=chip;
+  elChip.className='sync-chip '+cls;
+  elSyncStatus.textContent=st;
+  if(elGid && document.activeElement!==elGid) elGid.value=String(lsGet(LS_GID,'')||'');
+  if(elGidRow) elGidRow.style.display = (GOOGLE_CLIENT_ID||'').trim()? 'none':'';
+  if(elAuto) elAuto.checked=autoOn();
+}
+
+/* ---------- 事件綁定 ---------- */
+elChip.addEventListener('click', ()=>{ openDrawer(); $('syncBox').open=true; });
+$('gConnect').addEventListener('click', connectDrive);
+$('gSyncNow').addEventListener('click', ()=>syncNow({interactive:true}));
+$('gDisconnect').addEventListener('click', disconnect);
+$('wipeDevice').addEventListener('click', wipeDevice);
+$('gidSave').addEventListener('click', ()=>{
+  const v=elGid.value.trim();
+  lsSet(LS_GID, v); tokenClient=null;
+  setSyncUI(); toast(v? '已儲存用戶端 ID，接著按「連結雲端硬碟」':'已清除用戶端 ID');
+});
+elAuto.addEventListener('change', ()=>{ lsSet(LS_AUTO, elAuto.checked); setSyncUI(); if(elAuto.checked) syncSoon(); });
+window.addEventListener('online', ()=>{ if(isConnected()) syncNow({silent:true}); });
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden && isConnected() && autoOn() && Date.now()-lastSyncTry>60000) syncNow({silent:true});
+});
+
+elTitle.addEventListener('input', ()=>{ meta.title=elTitle.value; render(); });
+elDate .addEventListener('input', ()=>{ meta.date =elDate.value;  render(); });
+elMemo .addEventListener('input', ()=>{ meta.memo =elMemo.value;  render(); });
+elSave  .addEventListener('click', saveAsNew);
+elUpdate.addEventListener('click', updateCurrent);
+elQuick .addEventListener('click', saveOrUpdate);
+$('openRecs').addEventListener('click', openDrawer);
+$('recClose').addEventListener('click', closeDrawer);
+dwMask.addEventListener('click', closeDrawer);
+dwSearch.addEventListener('input', renderRecList);
+$('expJson').addEventListener('click', exportJson);
+$('expCsv') .addEventListener('click', exportCsv);
+$('impJson').addEventListener('click', ()=>$('impFile').click());
+$('impFile').addEventListener('change', e=>{ const f=e.target.files&&e.target.files[0]; if(f) importJson(f); e.target.value=''; });
+$('clearAllRecs').addEventListener('click', clearAllRecords);
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape' && dw.classList.contains('open')) closeDrawer();
+  if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.key==='S')){ e.preventDefault(); saveOrUpdate(); }
+});
+window.addEventListener('storage', e=>{
+  if(e.key===LS_REC){ RECS=lsGet(LS_REC,[])||[]; if(!Array.isArray(RECS)) RECS=[]; syncRecUI(); renderRecList(); }
+});
+
+/* ---------- 啟動 ---------- */
+RECS = lsGet(LS_REC, []); if(!Array.isArray(RECS)) RECS=[];
+DEFAULT_SNAP = { v:1, keepBlank:true, meta:{title:'',date:'',memo:''}, state:DEFAULT_STATE, collapsed:[] };
+const _draft = lsGet(LS_DRAFT, null);
+if(_draft && _draft.snap){
+  restoreSnapshot(_draft.snap);
+  currentId = _draft.currentId || null;
+  if(currentId && !currentRec()) currentId=null;
+} else {
+  meta.date = todayStr(); elDate.value = meta.date;
+  buildSections();
+}
+render();
+renderRecList();
+/* 設定說明裡直接顯示這個網站真正的來源，照抄貼進 Google Cloud 就不會填錯 */
+(function(){
+  const h=$('syncHelp'); if(!h) return;
+  const o=(location.protocol==='http:'||location.protocol==='https:')? location.origin
+        : '（要先把網站放上 GitHub Pages 才有來源可填；用檔案直接開的網頁沒辦法做 Google 登入）';
+  h.textContent=h.textContent.replace(/\{ORIGIN\}/g, o);
+})();
+setSyncUI();
+if(isConnected()) syncNow({silent:true});   /* 已登入過就靜靜地把其他裝置的更新拉回來 */
+</script>
+</body>
+</html>
