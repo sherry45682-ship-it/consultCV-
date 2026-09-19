@@ -287,6 +287,9 @@ const BADL     = ["完全獨立","部分依賴","完全依賴"];
 /* 選了「無法取得資料」時，其餘欄位自動隱藏 */
 const NOD = (st)=> !!(st.fields['nodata'] || (st.fother['nodata'] && String(st.fother['nodata']).trim()));
 
+/* 病人意願：第 1 題答「願意進一步了解」→ 後面的題目都不用問 */
+const WILL_Q2_HIDE = (st)=> String(st.fother['rehab'] || st.fields['rehab'] || '')==='願意進一步了解';
+
 const MODEL = [
 
 /* ================= 開頭固定文字（無標題、不需填寫） ================= */
@@ -386,10 +389,21 @@ const MODEL = [
 
 /* ================= 病人意願 ================= */
 { id:"will", name:"病人意願", en:"Patient willingness", outName:"病人意願", preset:true, fields:[
-  {type:"pick", label:"1.心肺復健", key:"rehab", def:"考慮", opts:["考慮","不想參加"],
-   info:"選「考慮」時，第 2 題自動隱藏且不輸出。"},
-  {type:"pick", label:"2.諮詢", key:"consult", opts:["考慮","不想參加"],
-   hideWhen:(st)=> String(st.fother['rehab'] || st.fields['rehab'] || '')==='考慮'}
+  {type:"pick",
+   label:"1.「出院後建議參加心臟復健療程，健保有給付，可降低心血管風險，您願意進一步了解嗎？」",
+   key:"rehab", def:"願意進一步了解", opts:["願意進一步了解","不想參加"],
+   info:"輸出：`1.心臟復健療程:願意進一步了解\n選「願意進一步了解」時，第 2 題會自動隱藏、也不會輸出。"},
+
+  {type:"pick",
+   label:"2.「出院後，臺大醫院復健部門診可安排一次性的體脂肪、肌少症及心肺適能評估，以了解您的健康狀況及提供後續體能活動諮詢。您願意接受評估嗎？現在可以協助您登記復健部門診？」",
+   key:"consult", opts:["願意接受","想先進一步了解","不願意接受"],
+   hideWhen:WILL_Q2_HIDE,
+   info:"第 1 題答「不想參加」時才會出現這一題。\n輸出：`2.復健部門診體能評估及掛號:願意接受"},
+
+  {type:"multi", label:"2-1. 不願意接受的原因（可複選）", key:"refuse", sep:"、",
+   opts:["醫師沒建議","自己覺得不需要","要上班","沒時間","太遠"],
+   hideWhen:(st)=> WILL_Q2_HIDE(st) || String(st.fother['consult'] || st.fields['consult'] || '')!=='不願意接受',
+   info:"只有第 2 題選「不願意接受」時才會出現。\n原因會接在第 2 題後面的括號裡：\n`2.復健部門診體能評估及掛號:不願意接受（要上班、太遠）\n其他原因請按「其他」直接輸入。"}
 ]}
 
 ];
@@ -667,12 +681,17 @@ brief(){
 },
 
 /* ---------- 病人意願 ---------- */
-will({V,has}){
+will({V,has,VJ}){
   const L=[];
   const q1 = has('rehab')? V('rehab') : null;
-  if(q1!==null) L.push('1.\u5fc3\u80ba\u5fa9\u5065:'+q1);
-  /* 第一題選「考慮」→ 第二題不用填、也不輸出 */
-  if(q1!=='\u8003\u616e' && has('consult')) L.push('2.\u8aee\u8a62:'+V('consult'));
+  if(q1!==null) L.push('1.心臟復健療程:'+q1);
+  /* 第 1 題答「願意進一步了解」→ 後面的題目不用問、也不輸出 */
+  if(q1!=='願意進一步了解' && has('consult')){
+    const q2=V('consult');
+    /* 不願意接受時，原因接在後面的括號裡 */
+    const why=(q2==='不願意接受' && has('refuse'))? '（'+VJ('refuse','、')+'）' : '';
+    L.push('2.復健部門診體能評估及掛號:'+q2+why);
+  }
   return L.join('\n');
 },
 
