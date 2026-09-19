@@ -1332,9 +1332,28 @@ window.addEventListener('storage', e=>{
 /* ---------- 啟動 ---------- */
 RECS = lsGet(LS_REC, []); if(!Array.isArray(RECS)) RECS=[];
 DEFAULT_SNAP = { v:1, keepBlank:true, meta:{title:'',date:'',memo:''}, state:DEFAULT_STATE, collapsed:[] };
+/* 改版後，舊草稿裡可能還存著已經不存在的選項值（例如意願題改寫前的「考慮」）。
+   這種值會讓按鈕一顆都不亮、連動判斷也失準 → 還原草稿時換回該欄位的預設值。
+   只處理「正在編輯的草稿」，已存檔的紀錄一律原封不動。 */
+function migrateDraft(snap){
+  if(!snap || !snap.state) return snap;
+  MODEL.forEach(sec=>{
+    const st=snap.state[sec.id];
+    if(!st || !st.fields) return;
+    sec.fields.forEach(f=>{
+      if(f.type!=='pick' || !Array.isArray(f.opts)) return;
+      const v=st.fields[f.key];
+      if(typeof v!=='string' || !v) return;
+      const ok=f.opts.some(o=> (o && typeof o==='object'? o.v : o)===v);
+      if(!ok) st.fields[f.key] = (typeof f.def==='string')? f.def : undefined;
+    });
+  });
+  return snap;
+}
+
 const _draft = lsGet(LS_DRAFT, null);
 if(_draft && _draft.snap){
-  restoreSnapshot(_draft.snap);
+  restoreSnapshot(migrateDraft(_draft.snap));
   currentId = _draft.currentId || null;
   if(currentId && !currentRec()) currentId=null;
 } else {
